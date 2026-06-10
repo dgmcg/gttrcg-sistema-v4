@@ -38,11 +38,27 @@ const GTTRCG_CONFIG_DEFAULTS = {
 // Apenas listas de referência e configurações.
 // ============================================================
 
+/**
+ * lsLocal(key, val) — grava APENAS no localStorage, SEM sincronizar com Sheets.
+ * Usado exclusivamente pelo initData para não sobrescrever o banco com
+ * valores padrão quando o localStorage está vazio em uma nova máquina.
+ */
+function lsLocal(key, val) {
+  if (val !== undefined) {
+    localStorage.setItem('gttrcg_' + key, JSON.stringify(val));
+    return val;
+  }
+  const v = localStorage.getItem('gttrcg_' + key);
+  return v ? JSON.parse(v) : null;
+}
+
 function initData() {
-  // Usuário admin master — único usuário inicial, protegido
-  // A senha será migrada para SHA-256 pelo auth.js
-  if (!ls('usuarios')) {
-    ls('usuarios', [{
+  // REGRA CRÍTICA: initData usa lsLocal() — NUNCA ls() — para não disparar
+  // gravarNoSheets() e sobrescrever o banco com arrays vazios em novos clientes.
+
+  // Usuário admin master — único usuário inicial
+  if (!lsLocal('usuarios')) {
+    lsLocal('usuarios', [{
       id: 'u_admin_master',
       nome: 'Administrador',
       login: 'admin',
@@ -53,9 +69,9 @@ function initData() {
     }]);
   }
 
-  // Listas de referência
-  if (!ls('statusProcesso')) {
-    ls('statusProcesso', [
+  // Listas de referência (fallback local — serão substituídas pelos dados do Sheets)
+  if (!lsLocal('statusProcesso')) {
+    lsLocal('statusProcesso', [
       'Aguardando Início do Processo',
       'Dimensionamento de Pessoal, Em Elaboração de TR',
       'Em Instrução',
@@ -65,29 +81,29 @@ function initData() {
       'Aguardando Precificação do Custeio',
       'Aguardando Precificação do Serviço/Produto',
       'Aguardando SOF/DDO',
+      'Aguardando Autorização da CPF',
       'Em Finalização da Instrução Processual',
       'Remetido à SAD',
       'Em Processo de Habilitação',
       'Em Avaliação de Recursos',
       'Em Contratação',
-      'Contratação Concluída',
       'Aguardando Assinatura do Contrato',
+      'Contratação Concluída',
     ]);
   }
 
-  if (!ls('tiposProcesso')) {
-    ls('tiposProcesso', ['Regular', 'Dispensa de Seleção', 'Emergencial']);
+  if (!lsLocal('tiposProcesso')) {
+    lsLocal('tiposProcesso', ['Regular', 'Dispensa de Seleção', 'Emergencial']);
   }
 
-  if (!ls('statusContrato')) {
-    ls('statusContrato', ['Vigente', 'Expirado', 'Nova Unidade']);
+  if (!lsLocal('statusContrato')) {
+    lsLocal('statusContrato', ['Vigente', 'Expirado', 'Nova Unidade']);
   }
 
-  if (!ls('fases')) {
-    ls('fases', [
+  if (!lsLocal('fases')) {
+    lsLocal('fases', [
       'Confecção de NT/ETP',
       'Confecção de TR',
-      'Aprovação',
       'Instrução Financeira',
       'Remessa à SAD',
       'Externa (SAD)',
@@ -96,15 +112,15 @@ function initData() {
     ]);
   }
 
-  if (!ls('tiposUnidade')) {
-    ls('tiposUnidade', [
+  if (!lsLocal('tiposUnidade')) {
+    lsLocal('tiposUnidade', [
       'Hospital', 'UPA', 'UPAE', 'CER', 'Maternidade',
       'Serviço Móvel', 'Serviço', 'Múltiplas', 'Hemocentro', 'Policlínica',
     ]);
   }
 
-  if (!ls('setores')) {
-    ls('setores', [
+  if (!lsLocal('setores')) {
+    lsLocal('setores', [
       'DGMCG','SEAS','GJCONV','DGAE','DGAIS','DGI','GTTRCG','DGES','DGAJ','SAD',
       'SCONT','SPAL','DGCC','DGPO','GAOCG','GGPCG','SECI','CPF','PGE','CCSAD V',
       'CCSAD IV','DGLCA','GMDP','DGPROJ','GACDE','GAJ - SES','DDGT','CJCG',
@@ -112,58 +128,49 @@ function initData() {
     ]);
   }
 
-  if (!ls('prazoAlerta')) ls('prazoAlerta', 18);
+  if (!lsLocal('prazoAlerta')) lsLocal('prazoAlerta', 18);
 
-  // Processos, unidades, OSS e etapas: vêm EXCLUSIVAMENTE do Sheets ou da importação
-  // NÃO inicializar aqui para não criar dados fictícios
-  if (!ls('processos'))  ls('processos', []);
-  if (!ls('unidades'))   ls('unidades', []);
-  if (!ls('oss'))        ls('oss', []);
+  // Processos, unidades, OSS, etapas: NÃO inicializar com dados fictícios.
+  // Apenas garante que a chave existe para evitar erros de leitura.
+  // Não chama lsLocal para evitar sobrescrita acidental caso o Sheets já tenha dados.
 
-  // Schemas dinâmicos padrão (se não existirem)
-  if (!ls('schema_unidades')) {
-    ls('schema_unidades', [
-      { key:'nome',          label:'Nome da Unidade',              tipo:'text',     protegido:true  },
-      { key:'sigla',         label:'Sigla',                        tipo:'text',     protegido:true  },
-      { key:'tipo',          label:'Tipo (Hospital, UPA, UPAE...)', tipo:'text',    protegido:true  },
-      { key:'cnpj',          label:'CNPJ da Unidade',              tipo:'text',     protegido:false },
-      { key:'cg',            label:'N° do Contrato de Gestão',     tipo:'text',     protegido:false },
-      { key:'cgInicio',      label:'Início do Contrato de Gestão', tipo:'date',     protegido:false },
-      { key:'cgFim',         label:'Fim do CG (10 anos)',          tipo:'date',     protegido:false },
-      { key:'vigencia2anos', label:'Fim da Vigência de 2 anos',    tipo:'date',     protegido:false },
-      { key:'macro',         label:'Macrorregião',                 tipo:'text',     protegido:false },
-      { key:'regiao',        label:'Região de Saúde',              tipo:'text',     protegido:false },
-      { key:'cidade',        label:'Cidade',                       tipo:'text',     protegido:false },
-      { key:'endereco',      label:'Endereço',                     tipo:'text',     protegido:false },
-      { key:'ossGestora',    label:'OSS Gestora Atual',            tipo:'text',     protegido:false },
-      { key:'cnpjOss',       label:'CNPJ da OSS Gestora',         tipo:'text',     protegido:false },
-      { key:'porte',         label:'Porte',                        tipo:'text',     protegido:false },
-      { key:'leitos',        label:'N° de Leitos',                 tipo:'text',     protegido:false },
-      { key:'statusCG',      label:'Status do C.G',               tipo:'listafixo', listaFonte:'statusContrato', protegido:false },
-      { key:'repasse',       label:'Repasse Mensal (R$)',          tipo:'moeda',    protegido:false },
+  // Schemas dinâmicos padrão
+  if (!lsLocal('schema_unidades')) {
+    lsLocal('schema_unidades', [
+      { key:'nome',          label:'Nome da Unidade',               tipo:'text',     protegido:true  },
+      { key:'sigla',         label:'Sigla',                         tipo:'text',     protegido:true  },
+      { key:'tipo',          label:'Tipo (Hospital, UPA, UPAE...)', tipo:'text',     protegido:true  },
+      { key:'cnpj',          label:'CNPJ da Unidade',               tipo:'text',     protegido:false },
+      { key:'cg',            label:'N° do Contrato de Gestão',      tipo:'text',     protegido:false },
+      { key:'cgInicio',      label:'Início do Contrato de Gestão',  tipo:'date',     protegido:false },
+      { key:'cgFim',         label:'Fim do CG (10 anos)',           tipo:'date',     protegido:false },
+      { key:'vigencia2anos', label:'Fim da Vigência de 2 anos',     tipo:'date',     protegido:false },
+      { key:'macro',         label:'Macrorregião',                  tipo:'text',     protegido:false },
+      { key:'regiao',        label:'Região de Saúde',               tipo:'text',     protegido:false },
+      { key:'cidade',        label:'Cidade',                        tipo:'text',     protegido:false },
+      { key:'endereco',      label:'Endereço',                      tipo:'text',     protegido:false },
+      { key:'ossGestora',    label:'OSS Gestora Atual',             tipo:'text',     protegido:false },
+      { key:'cnpjOss',       label:'CNPJ da OSS Gestora',          tipo:'text',     protegido:false },
+      { key:'porte',         label:'Porte',                         tipo:'text',     protegido:false },
+      { key:'leitos',        label:'N° de Leitos',                  tipo:'text',     protegido:false },
+      { key:'statusCG',      label:'Status do C.G',                tipo:'listafixo', listaFonte:'statusContrato', protegido:false },
+      { key:'repasse',       label:'Repasse Mensal (R$)',           tipo:'moeda',    protegido:false },
     ]);
   }
 
-  if (!ls('schema_oss')) {
-    ls('schema_oss', [
-      { key:'sigla',         label:'Sigla',                  tipo:'text', protegido:true  },
-      { key:'nome',          label:'Nome Completo',          tipo:'text', protegido:true  },
-      { key:'cnpj',          label:'CNPJ',                   tipo:'text', protegido:false },
-      { key:'endereco',      label:'Endereço',               tipo:'text', protegido:false },
-      { key:'municipio',     label:'Município',              tipo:'text', protegido:false },
-      { key:'uf',            label:'UF',                     tipo:'text', protegido:false },
-      { key:'telefone',      label:'Telefone',               tipo:'text', protegido:false },
-      { key:'email',         label:'E-mail',                 tipo:'text', protegido:false },
-      { key:'representante', label:'Representante Legal',    tipo:'text', protegido:false },
+  if (!lsLocal('schema_oss')) {
+    lsLocal('schema_oss', [
+      { key:'sigla',         label:'Sigla',                    tipo:'text', protegido:true  },
+      { key:'nome',          label:'Nome Completo',            tipo:'text', protegido:true  },
+      { key:'cnpj',          label:'CNPJ',                     tipo:'text', protegido:false },
+      { key:'endereco',      label:'Endereço',                 tipo:'text', protegido:false },
+      { key:'municipio',     label:'Município',                tipo:'text', protegido:false },
+      { key:'uf',            label:'UF',                       tipo:'text', protegido:false },
+      { key:'telefone',      label:'Telefone',                 tipo:'text', protegido:false },
+      { key:'email',         label:'E-mail',                   tipo:'text', protegido:false },
+      { key:'representante', label:'Representante Legal',      tipo:'text', protegido:false },
       { key:'qualificacao',  label:'Portaria de Qualificação', tipo:'text', protegido:false },
     ]);
-  }
-
-  // Etapas do fluxo: inicializa com as 39 etapas padrão GTTRCG
-  if (!ls('etapasFluxo')) {
-    // As etapas são carregadas pelo fluxo.js se existir o arquivo GTTRCG_fluxo_processos.json
-    // Aqui inicializamos com array vazio — serão importadas via Configurações → Importar
-    ls('etapasFluxo', []);
   }
 }
 
