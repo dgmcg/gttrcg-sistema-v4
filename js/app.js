@@ -271,6 +271,13 @@ async function bootSistema() {
     if (ok) {
       console.log('[GTTRCG] Dados carregados do Sheets ✓');
       updateSidebarCounts();
+      // Re-renderiza a página ativa caso o login tenha ocorrido antes
+      // dos dados chegarem — garante que aba anônima/nova máquina veja os dados
+      const paginaAtiva = document.querySelector('.page.active');
+      if (paginaAtiva && APP.currentUser) {
+        const pageId = paginaAtiva.id.replace('page-', '');
+        showPage(pageId);
+      }
     } else {
       console.warn('[GTTRCG] Falha ao carregar do Sheets — usando localStorage');
       initData();
@@ -281,6 +288,7 @@ async function bootSistema() {
 }
 
 // Inicia o sistema quando o DOM estiver pronto
-bootSistema();
+// Expõe a promise do boot para que o doLogin possa aguardá-la
+window._bootPromise = bootSistema();
 
 console.log('[GTTRCG] app.js carregado ✓');
