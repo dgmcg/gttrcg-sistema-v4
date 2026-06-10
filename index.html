@@ -1,0 +1,629 @@
+<!DOCTYPE html>
+<!-- GTTRCG v4 — SES-PE · SECI · DGMCG -->
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>GTTRCG — Sistema de Gerenciamento de Processos</title>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@300;400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+<div id="app">
+
+<!-- ══ LOGIN ════════════════════════════════════════════════════ -->
+<div id="login-screen">
+  <div class="login-card">
+    <div class="login-logo">
+      <svg width="32" height="32" viewBox="0 0 32 32" fill="currentColor">
+        <rect x="2" y="2" width="12" height="12" rx="3" opacity=".9"/>
+        <rect x="18" y="2" width="12" height="12" rx="3" opacity=".6"/>
+        <rect x="2" y="18" width="12" height="12" rx="3" opacity=".6"/>
+        <rect x="18" y="18" width="12" height="12" rx="3" opacity=".3"/>
+      </svg>
+      <div><h1>GTTRCG</h1><p>Sistema de Monitoramento de Processos</p></div>
+    </div>
+    <div class="login-form">
+      <div id="login-error" class="login-error">Usuário ou senha inválidos.</div>
+      <div class="field"><label>Usuário</label><input type="text" id="login-user" placeholder="Digite seu usuário" autocomplete="username"></div>
+      <div class="field"><label>Senha</label><input type="password" id="login-pass" placeholder="Digite sua senha" autocomplete="current-password"></div>
+      <button class="btn primary" onclick="doLogin()">
+        <svg viewBox="0 0 16 16" fill="currentColor"><path d="M3 2a1 1 0 0 1 1-1h8a1 1 0 0 1 1 1v4h-1V2H4v12h8v-4h1v4a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1V2z"/><path d="M10.854 8.354a.5.5 0 0 0 0-.708l-3-3a.5.5 0 1 0-.708.708L9.293 7.5H6.5a.5.5 0 0 0 0 1h2.793l-2.147 2.146a.5.5 0 0 0 .708.708l3-3z"/></svg>
+        Entrar
+      </button>
+    </div>
+    <p style="margin-top:16px;font-size:11px;color:var(--text3);text-align:center;">SES-PE · SECI · DGMCG · GTTRCG</p>
+  </div>
+</div>
+
+<!-- ══ TOPBAR ════════════════════════════════════════════════════ -->
+<div id="topbar">
+  <div class="topbar-brand">
+    <svg width="22" height="22" viewBox="0 0 32 32" fill="currentColor">
+      <rect x="2" y="2" width="12" height="12" rx="3" opacity=".9"/>
+      <rect x="18" y="2" width="12" height="12" rx="3" opacity=".6"/>
+      <rect x="2" y="18" width="12" height="12" rx="3" opacity=".6"/>
+      <rect x="18" y="18" width="12" height="12" rx="3" opacity=".3"/>
+    </svg>
+    <div><span>GTTRCG</span><br><small>SES-PE · DGMCG</small></div>
+  </div>
+  <nav class="topbar-nav">
+    <div class="nav-item active" onclick="showPage('dashboard')" id="nav-dashboard">
+      <svg viewBox="0 0 16 16" fill="currentColor"><path d="M8 4a.5.5 0 0 1 .5.5v3h3a.5.5 0 0 1 0 1h-3v3a.5.5 0 0 1-1 0v-3h-3a.5.5 0 0 1 0-1h3v-3A.5.5 0 0 1 8 4z"/><path d="M1 2.5A1.5 1.5 0 0 1 2.5 1h11A1.5 1.5 0 0 1 15 2.5v11a1.5 1.5 0 0 1-1.5 1.5h-11A1.5 1.5 0 0 1 1 13.5v-11z"/></svg>
+      Painel
+    </div>
+    <div class="nav-item" onclick="showPage('monitoramento')" id="nav-monitoramento">
+      <svg viewBox="0 0 16 16" fill="currentColor"><path d="M14 1a1 1 0 0 1 1 1v12a1 1 0 0 1-1 1H2a1 1 0 0 1-1-1V2a1 1 0 0 1 1-1h12z"/></svg>
+      Monitoramento
+    </div>
+    <div class="nav-item" onclick="showPage('fluxo')" id="nav-fluxo">
+      <svg viewBox="0 0 16 16" fill="currentColor"><path fill-rule="evenodd" d="M6 3.5A1.5 1.5 0 0 1 7.5 2h1A1.5 1.5 0 0 1 10 3.5v1A1.5 1.5 0 0 1 8.5 6v.5H11a.5.5 0 0 1 .5.5v.5h.5a1.5 1.5 0 0 1 0 3h-.5v.5a.5.5 0 0 1-.5.5H5a.5.5 0 0 1-.5-.5V9h-.5a1.5 1.5 0 0 1 0-3h.5V5.5a.5.5 0 0 1 .5-.5H8V6a1.5 1.5 0 0 1-1.5-1.5v-1z"/></svg>
+      Fluxo do Processo
+    </div>
+    <div class="nav-item" onclick="showPage('alertas')" id="nav-alertas">
+      <svg viewBox="0 0 16 16" fill="currentColor"><path d="M8 16a2 2 0 0 0 2-2H6a2 2 0 0 0 2 2zM8 1.918l-.797.161A4.002 4.002 0 0 0 4 6c0 .628-.134 2.197-.459 3.742-.16.767-.376 1.566-.663 2.258h10.244c-.287-.692-.502-1.49-.663-2.258C12.134 8.197 12 6.628 12 6a4.002 4.002 0 0 0-3.203-3.92L8 1.917z"/></svg>
+      Alertas <span id="alertas-count" class="notif-badge" style="display:none">0</span>
+    </div>
+    <div class="nav-item" onclick="showPage('contratos')" id="nav-contratos">
+      <svg viewBox="0 0 16 16" fill="currentColor"><path d="M9.5 0H4a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h8a2 2 0 0 0 2-2V4.5L9.5 0zm0 1v2A1.5 1.5 0 0 0 11 4.5h2V14a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1V2a1 1 0 0 1 1-1h5.5z"/></svg>
+      Contratos
+    </div>
+    <div class="nav-item" onclick="showPage('configuracoes')" id="nav-configuracoes">
+      <svg viewBox="0 0 16 16" fill="currentColor"><path d="M8 4.754a3.246 3.246 0 1 0 0 6.492 3.246 3.246 0 0 0 0-6.492zM5.754 8a2.246 2.246 0 1 1 4.492 0 2.246 2.246 0 0 1-4.492 0z"/><path d="M9.796 1.343c-.527-1.79-3.065-1.79-3.592 0l-.094.319a.873.873 0 0 1-1.255.52l-.292-.16c-1.64-.892-3.433.902-2.54 2.541l.159.292a.873.873 0 0 1-.52 1.255l-.319.094c-1.79.527-1.79 3.065 0 3.592l.319.094a.873.873 0 0 1 .52 1.255l-.16.292c-.892 1.64.901 3.434 2.541 2.54l.292-.159a.873.873 0 0 1 1.255.52l.094.319c.527 1.79 3.065 1.79 3.592 0l.094-.319a.873.873 0 0 1 1.255-.52l.292.16c1.64.892 3.433-.902 2.54-2.541l-.159-.292a.873.873 0 0 1 .52-1.255l.319-.094c1.79-.527 1.79-3.065 0-3.592l-.319-.094a.873.873 0 0 1-.52-1.255l.16-.292c.892-1.64-.901-3.433-2.541-2.54l-.292.159a.873.873 0 0 1-1.255-.52l-.094-.319z"/></svg>
+      Configurações
+    </div>
+    <!-- Botão Undo injetado por modais.js -->
+  </nav>
+  <div class="topbar-user" style="position:relative">
+    <div class="user-info">
+      <strong id="user-name-display">-</strong>
+      <small id="user-role-display">-</small>
+    </div>
+    <div class="user-avatar" id="user-avatar" onclick="toggleUserMenu()">?</div>
+    <!-- Menu de usuário injetado por modais.js -->
+  </div>
+</div>
+
+<!-- ══ MAIN ══════════════════════════════════════════════════════ -->
+<div id="main">
+  <!-- Sidebar -->
+  <aside id="sidebar">
+    <div class="sidebar-section">Visão Geral</div>
+    <div class="sidebar-item active" onclick="showPage('dashboard')">
+      <svg width="14" height="14" viewBox="0 0 16 16" fill="currentColor"><path d="M2 4a2 2 0 0 1 2-2h8a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V4z"/></svg>
+      Dashboard
+    </div>
+    <div class="sidebar-item" onclick="showPage('monitoramento')">
+      <svg width="14" height="14" viewBox="0 0 16 16" fill="currentColor"><path d="M1 2.5A1.5 1.5 0 0 1 2.5 1h11A1.5 1.5 0 0 1 15 2.5v11a1.5 1.5 0 0 1-1.5 1.5h-11A1.5 1.5 0 0 1 1 13.5v-11z"/></svg>
+      Todos os Processos <span class="sidebar-count" id="sidebar-total">0</span>
+    </div>
+    <div class="sidebar-item" onclick="filterSidebarStatus('em_andamento')">
+      <svg width="14" height="14" viewBox="0 0 16 16" fill="currentColor"><circle cx="8" cy="8" r="6"/></svg>
+      Em Andamento <span class="sidebar-count" id="sidebar-andamento">0</span>
+    </div>
+    <div class="sidebar-item" onclick="filterSidebarStatus('remetido')">
+      <svg width="14" height="14" viewBox="0 0 16 16" fill="currentColor"><path d="M2 4a2 2 0 0 1 2-2h8a2 2 0 0 1 2 2v1H2V4zm0 3h12v5a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V7z"/></svg>
+      Remetidos à SAD <span class="sidebar-count" id="sidebar-remetido">0</span>
+    </div>
+    <div class="sidebar-item" onclick="filterSidebarStatus('aguardando')">
+      <svg width="14" height="14" viewBox="0 0 16 16" fill="currentColor"><path d="M8 3.5a.5.5 0 0 0-1 0V9a.5.5 0 0 0 .252.434l3.5 2a.5.5 0 0 0 .496-.868L8 8.71V3.5z"/><path d="M8 16A8 8 0 1 0 8 0a8 8 0 0 0 0 16z"/></svg>
+      Aguardando <span class="sidebar-count" id="sidebar-aguardando">0</span>
+    </div>
+    <div class="sidebar-item" id="sidebar-assinatura-item" onclick="filterSidebarStatus('assinatura')">
+      <svg width="14" height="14" viewBox="0 0 16 16" fill="currentColor"><path d="M9.5 0H4a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h8a2 2 0 0 0 2-2V4.5L9.5 0zm0 1v2A1.5 1.5 0 0 0 11 4.5h2V14a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1V2a1 1 0 0 1 1-1h5.5z"/></svg>
+      Ag. Assinatura <span class="sidebar-count" id="sidebar-assinatura">0</span>
+    </div>
+    <div class="sidebar-section">Unidades</div>
+    <div class="sidebar-item" onclick="filterSidebarTipo('Hospital')">
+      <svg width="14" height="14" viewBox="0 0 16 16" fill="currentColor"><rect x="1" y="3" width="14" height="11" rx="1" fill="none" stroke="currentColor" stroke-width="1.5"/><path d="M7 7v4M5 9h6M8 3V1"/></svg>
+      Hospitais
+    </div>
+    <div class="sidebar-item" onclick="filterSidebarTipo('UPA')">
+      <svg width="14" height="14" viewBox="0 0 16 16" fill="currentColor"><path d="M3 14s-1 0-1-1 1-4 6-4 6 3 6 4-1 1-1 1H3zm5-6a3 3 0 1 0 0-6 3 3 0 0 0 0 6z"/></svg>
+      UPAs
+    </div>
+    <div class="sidebar-item" onclick="filterSidebarTipo('UPAE')">
+      <svg width="14" height="14" viewBox="0 0 16 16" fill="currentColor"><path d="M3 14s-1 0-1-1 1-4 6-4 6 3 6 4-1 1-1 1H3zm5-6a3 3 0 1 0 0-6 3 3 0 0 0 0 6z"/></svg>
+      UPAEs
+    </div>
+    <div class="sidebar-item" onclick="filterSidebarTipo('CER')">
+      <svg width="14" height="14" viewBox="0 0 16 16" fill="currentColor"><path d="M3 14s-1 0-1-1 1-4 6-4 6 3 6 4-1 1-1 1H3zm5-6a3 3 0 1 0 0-6 3 3 0 0 0 0 6z"/></svg>
+      CERs
+    </div>
+    <div class="sidebar-section">Favoritos</div>
+    <div class="sidebar-item" onclick="filterSidebarFavoritos()">
+      <svg width="14" height="14" viewBox="0 0 16 16" fill="currentColor"><path d="M3.612 15.443c-.386.198-.824-.149-.746-.592l.83-4.73L.173 6.765c-.329-.314-.158-.888.283-.95l4.898-.696L7.538.792c.197-.39.73-.39.927 0l2.184 4.327 4.898.696c.441.062.612.636.282.95l-3.522 3.356.83 4.73c.078.443-.36.79-.746.592L8 13.187l-4.389 2.256z"/></svg>
+      Favoritos <span class="sidebar-count" id="sidebar-favoritos">0</span>
+    </div>
+    <div class="sidebar-section">Ações</div>
+    <div class="sidebar-item" onclick="openNovoProcesso()">
+      <svg width="14" height="14" viewBox="0 0 16 16" fill="currentColor"><path d="M8 2a.5.5 0 0 1 .5.5v5h5a.5.5 0 0 1 0 1h-5v5a.5.5 0 0 1-1 0v-5h-5a.5.5 0 0 1 0-1h5v-5A.5.5 0 0 1 8 2z"/></svg>
+      Novo Processo
+    </div>
+    <div class="sidebar-item" onclick="showPage('alertas')">
+      <svg width="14" height="14" viewBox="0 0 16 16" fill="currentColor"><path d="M8 16a2 2 0 0 0 2-2H6a2 2 0 0 0 2 2zM8 1.918l-.797.161A4.002 4.002 0 0 0 4 6c0 .628-.134 2.197-.459 3.742-.16.767-.376 1.566-.663 2.258h10.244c-.287-.692-.502-1.49-.663-2.258C12.134 8.197 12 6.628 12 6a4.002 4.002 0 0 0-3.203-3.92L8 1.917z"/></svg>
+      Alertas <span class="sidebar-count" id="sidebar-alertas">0</span>
+    </div>
+  </aside>
+
+  <!-- Conteúdo principal -->
+  <div id="content">
+
+    <!-- ── DASHBOARD ─────────────────────────────────── -->
+    <div id="page-dashboard" class="page active">
+      <div class="page-header">
+        <div>
+          <div class="page-title">Painel de Controle <small>GTTRCG</small></div>
+          <div style="font-size:12px;color:var(--text3);margin-top:3px" id="dashboard-date"></div>
+        </div>
+        <div class="page-actions">
+          <button class="btn" onclick="openNovoProcesso()">
+            <svg viewBox="0 0 16 16" fill="currentColor"><path d="M8 2a.5.5 0 0 1 .5.5v5h5a.5.5 0 0 1 0 1h-5v5a.5.5 0 0 1-1 0v-5h-5a.5.5 0 0 1 0-1h5v-5A.5.5 0 0 1 8 2z"/></svg>
+            Novo Processo
+          </button>
+        </div>
+      </div>
+      <!-- Tabs Dashboard (injetadas por dashboard.js) -->
+      <div id="stats-grid" class="stats-grid"></div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-bottom:20px" id="charts-row"></div>
+      <div class="table-wrap">
+        <div class="table-toolbar">
+          <span style="font-size:13px;font-weight:500">Processos Recentes</span>
+          <div style="flex:1"></div>
+          <button class="btn sm" onclick="showPage('monitoramento')">Ver Todos →</button>
+        </div>
+        <table id="dashboard-table">
+          <thead><tr><th>Unidade</th><th>Tipo</th><th>Status</th><th>Progresso</th><th>Início</th><th>Duração</th></tr></thead>
+          <tbody id="dashboard-tbody"></tbody>
+        </table>
+      </div>
+    </div>
+
+    <!-- ── MONITORAMENTO ──────────────────────────────── -->
+    <div id="page-monitoramento" class="page">
+      <div class="page-header">
+        <div class="page-title">Monitoramento de Processos</div>
+        <div class="page-actions">
+          <div style="display:flex;background:var(--bg2);border:1px solid var(--border);border-radius:var(--radius);padding:2px;gap:2px">
+            <button class="btn sm" id="view-lista-btn" onclick="setMonitorView('lista')" style="background:var(--bg3);border-color:var(--border2)">
+              <svg viewBox="0 0 16 16" fill="currentColor" width="13" height="13"><path d="M2.5 12a.5.5 0 0 1 .5-.5h10a.5.5 0 0 1 0 1H3a.5.5 0 0 1-.5-.5zm0-4a.5.5 0 0 1 .5-.5h10a.5.5 0 0 1 0 1H3a.5.5 0 0 1-.5-.5zm0-4a.5.5 0 0 1 .5-.5h10a.5.5 0 0 1 0 1H3a.5.5 0 0 1-.5-.5z"/></svg>
+              Lista
+            </button>
+            <button class="btn sm" id="view-kanban-btn" onclick="setMonitorView('kanban')">
+              <svg viewBox="0 0 16 16" fill="currentColor" width="13" height="13"><path d="M1 4a1 1 0 0 1 1-1h2a1 1 0 0 1 1 1v10a1 1 0 0 1-1 1H2a1 1 0 0 1-1-1V4zm5 0a1 1 0 0 1 1-1h2a1 1 0 0 1 1 1v10a1 1 0 0 1-1 1H7a1 1 0 0 1-1-1V4zm5 0a1 1 0 0 1 1-1h2a1 1 0 0 1 1 1v10a1 1 0 0 1-1 1h-2a1 1 0 0 1-1-1V4z"/></svg>
+              Kanban
+            </button>
+          </div>
+          <button class="btn" onclick="openNovoProcesso()">
+            <svg viewBox="0 0 16 16" fill="currentColor"><path d="M8 2a.5.5 0 0 1 .5.5v5h5a.5.5 0 0 1 0 1h-5v5a.5.5 0 0 1-1 0v-5h-5a.5.5 0 0 1 0-1h5v-5A.5.5 0 0 1 8 2z"/></svg>
+            Novo Processo
+          </button>
+        </div>
+      </div>
+      <!-- Toolbar de filtros (fora da table-wrap para aparecer no kanban) -->
+      <div class="table-toolbar" style="background:var(--bg1);border:1px solid var(--border);border-radius:var(--radius2);padding:10px 14px;margin-bottom:12px;flex-wrap:wrap;gap:8px">
+        <input type="search" id="monitor-search" placeholder="Buscar por unidade, SEI, OSS..." oninput="renderMonitoramento()" style="flex:1;min-width:200px;max-width:320px">
+        <select id="monitor-tipo" onchange="renderMonitoramento()"><option value="">Todos os tipos</option></select>
+        <select id="monitor-status" onchange="renderMonitoramento()"><option value="">Todos os status</option></select>
+        <select id="monitor-fase" onchange="renderMonitoramento()"><option value="">Todas as fases</option></select>
+        <select id="monitor-usuario" onchange="renderMonitoramento()"><option value="">Todos os usuários</option></select>
+      </div>
+      <div class="table-wrap" style="overflow-x:auto">
+        <table style="min-width:900px">
+          <thead>
+            <tr>
+              <th style="width:24px"></th>
+              <th onclick="sortTable('nome')">Unidade ↕</th>
+              <th onclick="sortTable('tipo')">Tipo ↕</th>
+              <th>OSS</th>
+              <th>N° SEI</th>
+              <th onclick="sortTable('status')">Status ↕</th>
+              <th>Fase Atual</th>
+              <th>Progresso</th>
+              <th onclick="sortTable('inicio')">Início ↕</th>
+              <th>Ações</th>
+            </tr>
+          </thead>
+          <tbody id="monitor-tbody"></tbody>
+        </table>
+        <div id="monitor-empty" class="empty-state" style="display:none">
+          <svg width="48" height="48" viewBox="0 0 16 16" fill="currentColor"><path d="M14 1a1 1 0 0 1 1 1v12a1 1 0 0 1-1 1H2a1 1 0 0 1-1-1V2a1 1 0 0 1 1-1h12z"/></svg>
+          <p>Nenhum processo encontrado</p>
+        </div>
+      </div>
+      <div id="kanban-view" style="display:none"></div>
+    </div>
+
+    <!-- ── FLUXO DO PROCESSO ──────────────────────────── -->
+    <div id="page-fluxo" class="page">
+      <div class="page-header">
+        <div class="page-title">Fluxo do Processo <small>Desenho e Protocolos</small></div>
+        <div class="page-actions">
+          <button class="btn" onclick="openEditarFluxo()">
+            <svg viewBox="0 0 16 16" fill="currentColor"><path d="M12.146.146a.5.5 0 0 1 .708 0l3 3a.5.5 0 0 1 0 .708l-10 10a.5.5 0 0 1-.168.11l-5 2a.5.5 0 0 1-.65-.65l2-5a.5.5 0 0 1 .11-.168l10-10z"/></svg>
+            Editar Fluxo
+          </button>
+          <button class="btn" onclick="openAdicionarEtapa()">
+            <svg viewBox="0 0 16 16" fill="currentColor"><path d="M8 2a.5.5 0 0 1 .5.5v5h5a.5.5 0 0 1 0 1h-5v5a.5.5 0 0 1-1 0v-5h-5a.5.5 0 0 1 0-1h5v-5A.5.5 0 0 1 8 2z"/></svg>
+            Adicionar Etapa
+          </button>
+        </div>
+      </div>
+      <div class="alert info" style="margin-bottom:20px">
+        <svg viewBox="0 0 16 16" fill="currentColor" width="14" height="14" style="flex-shrink:0;margin-top:1px"><path d="M8 16A8 8 0 1 0 8 0a8 8 0 0 0 0 16zm.93-9.412-1 4.705c-.07.34.029.533.304.533.194 0 .487-.07.686-.246l-.088.416c-.287.346-.92.598-1.465.598-.703 0-1.002-.422-.808-1.319l.738-3.468c.064-.293.006-.399-.287-.47l-.451-.081.082-.381 2.29-.287zM8 5.5a1 1 0 1 1 0-2 1 1 0 0 1 0 2z"/></svg>
+        Mapa do fluxo GTTRCG — 39 etapas em 3 fases. Clique em qualquer etapa para editar.
+      </div>
+      <div id="fluxo-container"></div>
+    </div>
+
+    <!-- ── ALERTAS ────────────────────────────────────── -->
+    <div id="page-alertas" class="page">
+      <div class="page-header"><div class="page-title">Alertas e Notificações</div></div>
+      <div class="tabs-container">
+        <div class="tabs">
+          <div class="tab active" onclick="switchAlertsTab('urgente',this)">🔴 Urgentes</div>
+          <div class="tab" onclick="switchAlertsTab('atencao',this)">🟡 Atenção</div>
+          <div class="tab" onclick="switchAlertsTab('info',this)">🔵 Informativos</div>
+        </div>
+      </div>
+      <div id="tab-urgente" class="tab-content active"><div class="alerts-list" id="alerts-urgente"></div></div>
+      <div id="tab-atencao" class="tab-content"><div class="alerts-list" id="alerts-atencao"></div></div>
+      <div id="tab-info" class="tab-content"><div class="alerts-list" id="alerts-info"></div></div>
+    </div>
+
+    <!-- ── CONTRATOS ──────────────────────────────────── -->
+    <div id="page-contratos" class="page">
+      <div class="page-header">
+        <div class="page-title">Contratos de Gestão <small>Vigência & Alertas</small></div>
+        <div class="page-actions" style="gap:8px;flex-wrap:wrap">
+          <input type="search" id="ct-search" placeholder="Buscar unidade..." style="width:180px" oninput="renderContratos()">
+          <select id="ct-oss" onchange="renderContratos()"><option value="">Todas as OSS</option></select>
+          <select id="ct-tipo" onchange="renderContratos()"><option value="">Todos os tipos</option></select>
+          <select id="ct-status" onchange="renderContratos()">
+            <option value="">Todos os status</option>
+            <option value="vigente">Vigente</option>
+            <option value="alerta">Alerta</option>
+            <option value="expirado">Expirado</option>
+          </select>
+        </div>
+      </div>
+      <div id="ct-kpis" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(130px,1fr));gap:10px;margin-bottom:16px"></div>
+      <div class="tabs" style="margin-bottom:0" id="ct-tabs">
+        <div class="tab active" data-tab="ct-lista" onclick="switchCtTab('ct-lista',this)">📋 Lista de Contratos</div>
+        <div class="tab" data-tab="ct-oss" onclick="switchCtTab('ct-oss',this)">🏥 Por OSS</div>
+        <div class="tab" data-tab="ct-graficos" onclick="switchCtTab('ct-graficos',this)">📊 Gráficos Gerais</div>
+      </div>
+      <div id="ct-bottom" style="display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-top:14px">
+        <div class="config-section" style="margin:0"><div class="config-section-header"><div class="config-section-title">🔴 Top 10 Críticos</div></div><div id="ct-criticos" class="config-section-body"></div></div>
+        <div class="config-section" style="margin:0"><div class="config-section-header"><div class="config-section-title">📊 Distribuição por Status</div></div><div id="ct-status-dist" class="config-section-body"></div></div>
+      </div>
+      <div id="tab-ct-lista" class="tab-content active" style="margin-top:14px">
+        <div style="overflow-x:auto">
+          <table id="ct-table" style="width:100%;border-collapse:collapse;font-size:12px">
+            <thead><tr>
+              <th style="padding:8px 10px;text-align:left;font-size:11px;color:var(--text2)">UNIDADE</th>
+              <th style="padding:8px 10px;text-align:left;font-size:11px;color:var(--text2)">TIPO</th>
+              <th style="padding:8px 10px;text-align:left;font-size:11px;color:var(--text2)">OSS</th>
+              <th style="padding:8px 10px;text-align:left;font-size:11px;color:var(--text2)">Nº CG</th>
+              <th style="padding:8px 10px;text-align:left;font-size:11px;color:var(--text2)">Fim CG (10A)</th>
+              <th style="padding:8px 10px;text-align:left;font-size:11px;color:var(--text2)">Fim Vigência 2A</th>
+              <th style="padding:8px 10px;text-align:left;font-size:11px;color:var(--text2)">Previsão Novo Processo</th>
+              <th style="padding:8px 10px;text-align:left;font-size:11px;color:var(--text2)">Dias p/ Fim CG</th>
+              <th style="padding:8px 10px;text-align:left;font-size:11px;color:var(--text2)">Status Geral</th>
+              <th style="padding:8px 10px;text-align:right;font-size:11px;color:var(--text2)">Repasse Mensal</th>
+            </tr></thead>
+            <tbody id="ct-tbody"></tbody>
+          </table>
+          <div id="ct-empty" style="display:none;text-align:center;padding:40px;color:var(--text3)">Nenhuma unidade encontrada</div>
+        </div>
+      </div>
+      <div id="tab-ct-oss" class="tab-content" style="margin-top:14px"><div id="ct-por-oss"></div></div>
+      <div id="tab-ct-graficos" class="tab-content" style="margin-top:14px">
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px">
+          <div class="config-section" style="margin:0"><div class="config-section-header"><div class="config-section-title">Contratos por OSS</div></div><div class="config-section-body"><canvas id="chart-oss" height="260"></canvas></div></div>
+          <div class="config-section" style="margin:0"><div class="config-section-header"><div class="config-section-title">Distribuição por Tipo</div></div><div class="config-section-body"><canvas id="chart-tipo" height="260"></canvas></div></div>
+          <div class="config-section" style="margin:0"><div class="config-section-header"><div class="config-section-title">Status por OSS</div></div><div class="config-section-body"><canvas id="chart-status-oss" height="260"></canvas></div></div>
+          <div class="config-section" style="margin:0"><div class="config-section-header"><div class="config-section-title">Vencimentos por Trimestre</div></div><div class="config-section-body"><canvas id="chart-trimestre" height="260"></canvas></div></div>
+          <div class="config-section" style="margin:0;grid-column:1/-1"><div class="config-section-header"><div class="config-section-title">💰 Repasse Mensal por OSS</div></div><div class="config-section-body"><canvas id="chart-repasse" height="120"></canvas></div></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ── CONFIGURAÇÕES ──────────────────────────────── -->
+    <div id="page-configuracoes" class="page">
+      <div class="page-header"><div class="page-title">Configurações do Sistema</div></div>
+      <div class="tabs-container">
+        <div class="tabs">
+          <div class="tab active" onclick="switchConfigTab('dados',this)">Dados Fixos</div>
+          <div class="tab" onclick="switchConfigTab('usuarios',this)">Usuários</div>
+          <div class="tab" onclick="switchConfigTab('senha',this)">Minha Senha</div>
+          <div class="tab" data-tab="importar" onclick="switchConfigTab('importar',this)">📥 Importar</div>
+        </div>
+      </div>
+      <div id="tab-dados" class="tab-content active"><div id="dados-tabs-container"></div></div>
+      <div id="tab-usuarios" class="tab-content">
+        <div id="admin-notice" class="alert warning" style="margin-bottom:20px;display:none">
+          <svg viewBox="0 0 16 16" fill="currentColor" width="14" height="14" style="flex-shrink:0"><path d="M7.938 2.016A.13.13 0 0 1 8.002 2a.13.13 0 0 1 .063.016.146.146 0 0 1 .054.057l6.857 11.667c.036.06.035.124.002.183a.163.163 0 0 1-.054.06.116.116 0 0 1-.066.017H1.146a.115.115 0 0 1-.066-.017.163.163 0 0 1-.054-.06.176.176 0 0 1 .002-.183L7.884 2.073a.147.147 0 0 1 .054-.057z"/></svg>
+          Apenas administradores podem gerenciar usuários.
+        </div>
+        <div class="config-section">
+          <div class="config-section-header">
+            <div class="config-section-title">Usuários do Sistema</div>
+            <button class="btn sm primary" onclick="openAdicionarUsuario()" id="btn-add-user">+ Usuário</button>
+          </div>
+          <div class="config-section-body"><div class="config-list" id="usuarios-list"></div></div>
+        </div>
+      </div>
+      <div id="tab-senha" class="tab-content">
+        <div class="config-section">
+          <div class="config-section-header"><div class="config-section-title">Alterar Minha Senha</div></div>
+          <div class="config-section-body" style="max-width:400px">
+            <div class="field-group" style="margin-bottom:14px"><label>Senha Atual</label><input type="password" id="senha-atual" placeholder="Senha atual"></div>
+            <div class="field-group" style="margin-bottom:14px"><label>Nova Senha</label><input type="password" id="senha-nova" placeholder="Nova senha"></div>
+            <div class="field-group" style="margin-bottom:20px"><label>Confirmar Nova Senha</label><input type="password" id="senha-conf" placeholder="Confirme a nova senha"></div>
+            <div id="senha-msg" class="alert" style="display:none;margin-bottom:12px"></div>
+            <button class="btn primary" onclick="alterarSenha()">Salvar Nova Senha</button>
+          </div>
+        </div>
+      </div>
+      <div id="tab-importar" class="tab-content">
+        <div class="config-section">
+          <div class="config-section-header"><div class="config-section-title">Importar Dados Iniciais</div></div>
+          <div class="config-section-body">
+            <div class="alert info" style="margin-bottom:16px">
+              <svg viewBox="0 0 16 16" fill="currentColor" width="14" height="14" style="flex-shrink:0"><path d="M8 16A8 8 0 1 0 8 0a8 8 0 0 0 0 16zm.93-9.412-1 4.705c-.07.34.029.533.304.533.194 0 .487-.07.686-.246l-.088.416c-.287.346-.92.598-1.465.598-.703 0-1.002-.422-.808-1.319l.738-3.468c.064-.293.006-.399-.287-.47l-.451-.081.082-.381 2.29-.287zM8 5.5a1 1 0 1 1 0-2 1 1 0 0 1 0 2z"/></svg>
+              Importe <strong>GTTRCG_dados_iniciais.json</strong> para carregar unidades, OSS, setores e configurações. Processos não são afetados.
+            </div>
+            <label style="display:flex;align-items:center;gap:10px;cursor:pointer;padding:20px;border:2px dashed var(--border2);border-radius:var(--radius2);background:var(--bg2)" onmouseover="this.style.borderColor='var(--accent2)'" onmouseout="this.style.borderColor='var(--border2)'">
+              <svg viewBox="0 0 16 16" fill="currentColor" width="24" height="24" style="color:var(--accent2);flex-shrink:0"><path d="M.5 9.9a.5.5 0 0 1 .5.5v2.5a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1v-2.5a.5.5 0 0 1 1 0v2.5a2 2 0 0 1-2 2H2a2 2 0 0 1-2-2v-2.5a.5.5 0 0 1 .5-.5z"/><path d="M7.646 1.146a.5.5 0 0 1 .708 0l3 3a.5.5 0 0 1-.708.708L8.5 2.707V11.5a.5.5 0 0 1-1 0V2.707L5.354 4.854a.5.5 0 1 1-.708-.708l3-3z"/></svg>
+              <div><div style="font-size:14px;font-weight:500;color:var(--text)">Selecionar arquivo JSON</div><div style="font-size:12px;color:var(--text3);margin-top:2px">GTTRCG_dados_iniciais.json</div></div>
+              <input type="file" accept=".json,application/json" style="display:none" onchange="processarImportacao(this)">
+            </label>
+            <div id="import-preview" style="margin-top:16px;display:none"></div>
+            <div id="import-actions" style="display:none;margin-top:16px">
+              <button class="btn primary" onclick="confirmarImportacao()">✓ Confirmar Importação</button>
+              <button class="btn" onclick="cancelarImportacao()" style="margin-left:8px">Cancelar</button>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+  </div><!-- /content -->
+</div><!-- /main -->
+
+</div><!-- /app -->
+
+<!-- ══ MODAIS ══════════════════════════════════════════════════════ -->
+
+<!-- Modal: Novo/Editar Processo -->
+<div id="modal-processo" class="modal-overlay">
+  <div class="modal" style="width:780px;max-width:96vw">
+    <div class="modal-header">
+      <div><div class="modal-title" id="modal-processo-title">Novo Processo</div><div class="modal-subtitle">Cadastro de acompanhamento GTTRCG</div></div>
+      <button class="close-btn" onclick="closeModal('modal-processo')"><svg viewBox="0 0 16 16" fill="currentColor"><path d="M4.646 4.646a.5.5 0 0 1 .708 0L8 7.293l2.646-2.647a.5.5 0 0 1 .708.708L8.707 8l2.647 2.646a.5.5 0 0 1-.708.708L8 8.707l-2.646 2.647a.5.5 0 0 1-.708-.708L7.293 8 4.646 5.354a.5.5 0 0 1 0-.708z"/></svg></button>
+    </div>
+    <div class="modal-body" style="max-height:75vh;overflow-y:auto">
+      <input type="hidden" id="proc-id">
+      <div class="form-section-title" style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.6px;color:var(--text3);padding:12px 0 6px;border-bottom:1px solid var(--border);margin-bottom:14px;grid-column:1/-1">IDENTIFICAÇÃO DA UNIDADE</div>
+      <div class="form-grid">
+        <div class="field-group" style="grid-column:1/-1"><label>Unidade de Saúde *</label>
+          <select id="proc-unidade" onchange="autoFillUnidade()"><option value="">Selecionar...</option></select>
+        </div>
+        <div class="field-group"><label>Tipo</label><input type="text" id="proc-tipo" placeholder="Ex: Hospital, UPA..." list="list-tipos"><datalist id="list-tipos"></datalist></div>
+        <div class="field-group"><label>Nº Contrato de Gestão</label><input type="text" id="proc-cg" placeholder="Ex: 001/2023"></div>
+        <div class="field-group"><label>Sigla da OSS</label><input type="text" id="proc-oss" list="list-oss" placeholder="Ex: HTRI, FGH..."><datalist id="list-oss"></datalist></div>
+        <div class="field-group"><label>Macrorregião</label><input type="text" id="proc-macro" placeholder="Ex: I, II..."></div>
+        <div class="field-group"><label>Região de Saúde</label><input type="text" id="proc-regiao" placeholder="Ex: I, IV..."></div>
+        <div class="field-group"><label>Município</label><input type="text" id="proc-municipio" placeholder="Ex: Recife..."></div>
+        <div class="field-group"><label>Porte</label><input type="text" id="proc-porte" placeholder="Ex: Grande, Médio..."></div>
+        <div class="field-group"><label>Início da Vigência</label><input type="date" id="proc-vig-inicio"></div>
+        <div class="field-group"><label>Fim da Vigência (10 anos)</label><input type="date" id="proc-vig-fim"></div>
+        <div class="field-group"><label>Status do CG</label><select id="proc-status-cg-top"><option value="">Selecionar...</option></select></div>
+        <div class="field-group"><label>Status do CG (campo)</label><select id="proc-status-cg"><option value="">-</option></select></div>
+      </div>
+      <div style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.6px;color:var(--text3);padding:12px 0 6px;border-bottom:1px solid var(--border);margin-bottom:14px">DADOS DO PROCESSO</div>
+      <div class="form-grid">
+        <div class="field-group"><label>Nº SEI do Processo</label><input type="text" id="proc-sei" placeholder="Ex: 2300000000.000001/2025-01"></div>
+        <div class="field-group"><label>Tipo de Processo</label><select id="proc-tipo-processo"><option value="">Selecionar...</option></select></div>
+        <div class="field-group"><label>Área / NT Responsável</label><input type="text" id="proc-area-nt" list="list-setores" placeholder="Ex: SEAS/DGLCA"><datalist id="list-setores"></datalist><datalist id="list-pessoas"></datalist></div>
+        <div class="field-group" id="proc-responsavel-container"><label>Responsável GTTRCG</label><select id="proc-responsavel"><option value="">— Selecionar responsável —</option></select></div>
+        <div class="field-group"><label>Data de Início</label><input type="date" id="proc-inicio"></div>
+        <div class="field-group"><label>Previsão de Conclusão</label><input type="date" id="proc-previsao"></div>
+      </div>
+      <div style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.6px;color:var(--text3);padding:12px 0 6px;border-bottom:1px solid var(--border);margin-bottom:14px">STATUS E FASE ATUAL</div>
+      <div class="form-grid">
+        <div class="field-group"><label>Status Atual *</label><select id="proc-status"><option value="">Selecionar...</option></select></div>
+        <div class="field-group"><label>Fase Atual</label><select id="proc-fase"><option value="">Selecionar...</option></select></div>
+        <div class="field-group" style="grid-column:1/-1"><label>Observações</label><textarea id="proc-obs" rows="2" placeholder="Observações gerais sobre o processo..."></textarea></div>
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn" onclick="closeModal('modal-processo')">Cancelar</button>
+      <button class="btn primary" onclick="salvarProcesso()">Salvar Processo</button>
+    </div>
+  </div>
+</div>
+
+<!-- Modal: Detalhe do Processo (acompanhamento) -->
+<div id="modal-detalhe" class="modal-overlay">
+  <div class="modal modal-lg" style="max-width:1100px">
+    <div class="modal-header">
+      <div><div class="modal-title" id="detalhe-title">-</div><div class="modal-subtitle" id="detalhe-subtitle">-</div></div>
+      <button class="close-btn" onclick="closeModal('modal-detalhe')"><svg viewBox="0 0 16 16" fill="currentColor"><path d="M4.646 4.646a.5.5 0 0 1 .708 0L8 7.293l2.646-2.647a.5.5 0 0 1 .708.708L8.707 8l2.647 2.646a.5.5 0 0 1-.708.708L8 8.707l-2.646 2.647a.5.5 0 0 1-.708-.708L7.293 8 4.646 5.354a.5.5 0 0 1 0-.708z"/></svg></button>
+    </div>
+    <div class="modal-body" id="detalhe-body"></div>
+    <div class="modal-footer">
+      <button class="btn" onclick="closeModal('modal-detalhe')">Fechar</button>
+      <button class="btn" id="detalhe-edit-btn">
+        <svg viewBox="0 0 16 16" fill="currentColor" width="14" height="14"><path d="M12.146.146a.5.5 0 0 1 .708 0l3 3a.5.5 0 0 1 0 .708l-10 10a.5.5 0 0 1-.168.11l-5 2a.5.5 0 0 1-.65-.65l2-5a.5.5 0 0 1 .11-.168l10-10z"/></svg>
+        Editar Dados Gerais
+      </button>
+      <button class="btn primary" id="detalhe-save-btn" onclick="salvarAcompanhamento()">Salvar Acompanhamento</button>
+    </div>
+  </div>
+</div>
+
+<!-- Modal: Adicionar/Editar Etapa do Fluxo -->
+<div id="modal-etapa-fluxo" class="modal-overlay">
+  <div class="modal">
+    <div class="modal-header">
+      <div class="modal-title" id="modal-etapa-fluxo-title">Nova Etapa</div>
+      <button class="close-btn" onclick="closeModal('modal-etapa-fluxo')"><svg viewBox="0 0 16 16" fill="currentColor"><path d="M4.646 4.646a.5.5 0 0 1 .708 0L8 7.293l2.646-2.647a.5.5 0 0 1 .708.708L8.707 8l2.647 2.646a.5.5 0 0 1-.708.708L8 8.707l-2.646 2.647a.5.5 0 0 1-.708-.708L7.293 8 4.646 5.354a.5.5 0 0 1 0-.708z"/></svg></button>
+    </div>
+    <div class="modal-body">
+      <input type="hidden" id="etapa-id-edit">
+      <div class="form-grid">
+        <div class="field-group full"><label>Nome da Etapa *</label><input type="text" id="etapa-nome-edit" placeholder="Ex: Acionamento da SCONT"></div>
+        <div class="field-group"><label>Fase Principal *</label>
+          <select id="etapa-fase-edit">
+            <option value="planejamento">Fase de Planejamento, Instrução e Correção</option>
+            <option value="externa">Fase Externa - Publicação</option>
+            <option value="contratacao">Fase de Contratação</option>
+          </select>
+        </div>
+        <div class="field-group"><label>Responsável</label><input type="text" id="etapa-resp-edit" placeholder="Ex: GTTRCG"></div>
+        <div class="field-group"><label>Fase</label><input type="text" id="etapa-subfase-edit" placeholder="Ex: Confecção de NT/ETP"></div>
+        <div class="field-group"><label>Posição na Fase (ordem)</label><input type="number" id="etapa-ordem-edit" placeholder="Ex: 1, 2, 3..." min="1"></div>
+        <div class="field-group full"><label>Ação (protocolo)</label><textarea id="etapa-acao-edit" rows="2" placeholder="Descrição da ação desta etapa"></textarea></div>
+        <div style="font-size:11px;color:var(--text3);text-transform:uppercase;letter-spacing:.6px;padding:12px 0 6px;border-bottom:1px solid var(--border);margin-bottom:14px;grid-column:1/-1;font-weight:600">Campos de Acompanhamento</div>
+        <div class="field-group full">
+          <label>Campos desta Etapa (um por linha: tipo|label)</label>
+          <textarea id="etapa-campos-edit" rows="5" placeholder="Exemplos:&#10;boolean|Solicitado?&#10;date|Data&#10;text|Id SEI&#10;listafixo|OSS (lista oss)&#10;pdf|Documento"></textarea>
+          <div class="field-hint">Tipos: boolean, date, text, select, pdf, listafixo, autofield, moeda</div>
+        </div>
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn danger sm" id="btn-excluir-etapa" onclick="excluirEtapa()" style="margin-right:auto;display:none">Excluir Etapa</button>
+      <button class="btn" onclick="closeModal('modal-etapa-fluxo')">Cancelar</button>
+      <button class="btn primary" onclick="salvarEtapaFluxo()">Salvar Etapa</button>
+    </div>
+  </div>
+</div>
+
+<!-- Modal: Adicionar/Editar Usuário -->
+<div id="modal-usuario" class="modal-overlay">
+  <div class="modal" style="max-width:480px">
+    <div class="modal-header">
+      <div class="modal-title" id="modal-user-title">Novo Usuário</div>
+      <button class="close-btn" onclick="closeModal('modal-usuario')"><svg viewBox="0 0 16 16" fill="currentColor"><path d="M4.646 4.646a.5.5 0 0 1 .708 0L8 7.293l2.646-2.647a.5.5 0 0 1 .708.708L8.707 8l2.647 2.646a.5.5 0 0 1-.708.708L8 8.707l-2.646 2.647a.5.5 0 0 1-.708-.708L7.293 8 4.646 5.354a.5.5 0 0 1 0-.708z"/></svg></button>
+    </div>
+    <div class="modal-body">
+      <input type="hidden" id="user-id-edit">
+      <div class="field-group" style="margin-bottom:12px"><label>Nome Completo *</label><input type="text" id="user-nome" placeholder="Nome do usuário" style="width:100%"></div>
+      <div class="field-group" style="margin-bottom:12px"><label>Login (username) *</label><input type="text" id="user-login" placeholder="Ex: joao.silva" style="width:100%"></div>
+      <div class="field-group" style="margin-bottom:12px"><label>Matrícula</label><input type="text" id="user-matricula" placeholder="N° de matrícula" style="width:100%"></div>
+      <div class="field-group" style="margin-bottom:12px"><label>E-mail</label><input type="email" id="user-email" placeholder="usuario@email.com" style="width:100%"></div>
+      <div class="field-group" style="margin-bottom:12px"><label>Perfil</label><select id="user-perfil" style="width:100%"><option value="usuario">Usuário</option><option value="admin">Administrador</option></select></div>
+      <div class="alert info" style="margin-top:12px"><svg viewBox="0 0 16 16" fill="currentColor" width="14" height="14" style="flex-shrink:0"><path d="M8 16A8 8 0 1 0 8 0a8 8 0 0 0 0 16zm.93-9.412-1 4.705c-.07.34.029.533.304.533.194 0 .487-.07.686-.246l-.088.416c-.287.346-.92.598-1.465.598-.703 0-1.002-.422-.808-1.319l.738-3.468c.064-.293.006-.399-.287-.47l-.451-.081.082-.381 2.29-.287zM8 5.5a1 1 0 1 1 0-2 1 1 0 0 1 0 2z"/></svg>
+        Senha inicial: <strong>123</strong>. O usuário pode alterá-la em Configurações.</div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn" onclick="closeModal('modal-usuario')">Cancelar</button>
+      <button class="btn primary" onclick="salvarUsuario()">Salvar Usuário</button>
+    </div>
+  </div>
+</div>
+
+<!-- Modal: Editar Item de Dados Fixos -->
+<div id="modal-dado-fixo" class="modal-overlay">
+  <div class="modal" style="max-width:700px">
+    <div class="modal-header">
+      <div>
+        <div class="modal-title" id="modal-dado-title">Editar Item</div>
+        <div class="modal-subtitle" id="modal-dado-subtitle" style="font-size:11px;color:var(--text3);margin-top:2px"></div>
+      </div>
+      <button class="close-btn" onclick="closeModal('modal-dado-fixo')"><svg viewBox="0 0 16 16" fill="currentColor"><path d="M4.646 4.646a.5.5 0 0 1 .708 0L8 7.293l2.646-2.647a.5.5 0 0 1 .708.708L8.707 8l2.647 2.646a.5.5 0 0 1-.708.708L8 8.707l-2.646 2.647a.5.5 0 0 1-.708-.708L7.293 8 4.646 5.354a.5.5 0 0 1 0-.708z"/></svg></button>
+    </div>
+    <div class="modal-body" id="modal-dado-body"></div>
+    <div class="modal-footer">
+      <button class="btn danger sm" id="btn-excluir-dado" style="margin-right:auto" onclick="excluirDadoFixo()">Excluir</button>
+      <button class="btn" onclick="closeModal('modal-dado-fixo')">Cancelar</button>
+      <button class="btn primary" onclick="salvarDadoFixo()">Salvar</button>
+    </div>
+  </div>
+</div>
+
+<!-- ══ SCRIPTS — ORDEM IMPORTA ════════════════════════════════════ -->
+<script src="js/utils.js"></script>
+<script src="js/db.js"></script>
+<script src="js/auth.js"></script>
+<script src="js/app.js"></script>
+<script src="js/sidebar.js"></script>
+<script src="js/dashboard.js"></script>
+<script src="js/monitoramento.js"></script>
+<script src="js/fluxo.js"></script>
+<script src="js/alertas.js"></script>
+<script src="js/contratos.js"></script>
+<script src="js/configuracoes.js"></script>
+<script src="js/modais.js"></script>
+
+<!-- ══ CONFIGURAÇÃO EMBUTIDA (produção) ══════════════════════════ -->
+<script>
+const GTTRCG_CONFIG = {
+  appsScriptUrl: 'https://script.google.com/macros/s/AKfycbw2iLtPNMpUXtcImkRBORDMxjC_blqtRAyrlqtwxPuxbcCUS0cKDM-QERfWe0grWEwe/exec',
+  apiToken: 'dgmcg@2025',
+};
+
+// Aplica configuração embutida automaticamente
+(function() {
+  const url = GTTRCG_CONFIG.appsScriptUrl;
+  const token = GTTRCG_CONFIG.apiToken;
+  const urlValida = url && !url.includes('COLE_AQUI') && url.includes('script.google.com');
+  const tokenValido = token && !token.includes('COLE_AQUI') && token.length > 3;
+  if (urlValida) { localStorage.setItem('gttrcg_apps_script_url', url); }
+  if (tokenValido) { localStorage.setItem('gttrcg_api_token', token); }
+})();
+
+// Botão Undo na topbar
+(function injectUndoBtn() {
+  const nav = document.querySelector('.topbar-nav');
+  if (!nav || document.getElementById('undo-btn')) return;
+  const btn = document.createElement('button');
+  btn.id = 'undo-btn';
+  btn.className = 'btn';
+  btn.disabled = true;
+  btn.style.cssText = 'margin-left:auto;opacity:.4;font-size:12px;padding:4px 10px;flex-shrink:0';
+  btn.innerHTML = '↩ Desfazer';
+  btn.title = 'Nada para desfazer (Ctrl+Z)';
+  btn.onclick = () => UndoStack?.execute?.();
+  nav.appendChild(btn);
+})();
+
+// Menu de usuário (logoff)
+(function injectUserMenu() {
+  const avatar = document.getElementById('user-avatar');
+  if (!avatar) return;
+  const menu = document.createElement('div');
+  menu.id = 'user-menu';
+  menu.style.cssText = 'display:none;position:absolute;top:calc(100% + 4px);right:0;background:var(--bg1);border:1px solid var(--border2);border-radius:var(--radius2);min-width:180px;box-shadow:0 8px 24px rgba(0,0,0,.5);z-index:200;overflow:hidden';
+  menu.innerHTML = `
+    <div style="padding:12px 14px;border-bottom:1px solid var(--border);background:var(--bg2)">
+      <div id="user-menu-name" style="font-size:13px;font-weight:600"></div>
+      <div id="user-menu-role" style="font-size:11px;color:var(--text3);margin-top:2px"></div>
+    </div>
+    <div style="padding:6px">
+      <div class="sidebar-item" onclick="showPage('configuracoes');document.getElementById('user-menu').style.display='none'" style="border-radius:var(--radius);padding:8px 10px;cursor:pointer">
+        <svg width="14" height="14" viewBox="0 0 16 16" fill="currentColor"><path d="M8 4.754a3.246 3.246 0 1 0 0 6.492A3.246 3.246 0 0 0 8 4.754z"/></svg>
+        Configurações
+      </div>
+      <div style="height:1px;background:var(--border);margin:4px 0"></div>
+      <div class="sidebar-item" onclick="fazerLogoff()" style="border-radius:var(--radius);padding:8px 10px;color:var(--red2);cursor:pointer">
+        <svg width="14" height="14" viewBox="0 0 16 16" fill="currentColor"><path fill-rule="evenodd" d="M10 12.5a.5.5 0 0 1-.5.5h-8a.5.5 0 0 1-.5-.5v-9a.5.5 0 0 1 .5-.5h8a.5.5 0 0 1 .5.5v2a.5.5 0 0 0 1 0v-2A1.5 1.5 0 0 0 9.5 2h-8A1.5 1.5 0 0 0 0 3.5v9A1.5 1.5 0 0 0 1.5 14h8a1.5 1.5 0 0 0 1.5-1.5v-2a.5.5 0 0 0-1 0v2z"/><path fill-rule="evenodd" d="M15.854 8.354a.5.5 0 0 0 0-.708l-3-3a.5.5 0 0 0-.708.708L14.293 7.5H5.5a.5.5 0 0 0 0 1h8.793l-2.147 2.146a.5.5 0 0 0 .708.708l3-3z"/></svg>
+        Sair (Logoff)
+      </div>
+    </div>`;
+  const wrap = avatar.parentElement;
+  if (wrap && getComputedStyle(wrap).position === 'static') wrap.style.position = 'relative';
+  wrap.appendChild(menu);
+  document.addEventListener('click', ev => { if (!wrap.contains(ev.target)) menu.style.display = 'none'; }, true);
+})();
+
+// Animação do spinner (para análise de PDF)
+const styleEl = document.createElement('style');
+styleEl.textContent = '@keyframes gttrcg-spin { to { transform:rotate(360deg); } }';
+document.head.appendChild(styleEl);
+</script>
+</body>
+</html>
