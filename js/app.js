@@ -261,8 +261,8 @@ async function bootSistema() {
     console.log('[GTTRCG] Sem Sheets configurado — modo offline');
     initData();
     garantirAdminMaster();
-    updateSidebarCounts();
-    showSyncBadge('offline', 'URL não configurada');
+    if (typeof updateSidebarCounts === 'function') updateSidebarCounts();
+    if (typeof showSyncBadge === 'function') showSyncBadge('offline', 'URL não configurada');
   } else {
     // Com Sheets: garante admin master existe localmente
     garantirAdminMaster();
@@ -270,7 +270,7 @@ async function bootSistema() {
     const ok = await iniciarDB();
     if (ok) {
       console.log('[GTTRCG] Dados carregados do Sheets ✓');
-      updateSidebarCounts();
+      if (typeof updateSidebarCounts === 'function') updateSidebarCounts();
       // Re-renderiza a página ativa caso o login tenha ocorrido antes
       // dos dados chegarem — garante que aba anônima/nova máquina veja os dados
       const paginaAtiva = document.querySelector('.page.active');
