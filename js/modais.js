@@ -356,32 +356,9 @@ function toggleUserMenu() {
   }
 }
 
-// ── UndoStack ──────────────────────────────────────────────────
-const UndoStack = {
-  stack: [],
-  maxSize: 20,
-  push(action) {
-    this.stack.push({ ...action, ts: Date.now() });
-    if (this.stack.length > this.maxSize) this.stack.shift();
-    this.updateBtn();
-  },
-  pop() { return this.stack.pop() || null; },
-  peek() { return this.stack[this.stack.length - 1] || null; },
-  updateBtn() {
-    const btn = document.getElementById('undo-btn');
-    const last = this.peek();
-    if (btn) { btn.disabled = !last; btn.title = last ? `Desfazer: ${last.label} (Ctrl+Z)` : 'Nada para desfazer'; btn.style.opacity = last ? '1' : '.4'; }
-  },
-  execute() {
-    const action = this.pop();
-    if (!action) { showToast('Nada para desfazer'); return; }
-    try { action.undo(); this.updateBtn(); showToast(`↩ Desfeito: ${action.label}`); }
-    catch (e) { showToast('Erro ao desfazer: ' + e.message); }
-  }
-};
-
+// UndoStack definido em auth.js — apenas o listener de teclado aqui
 document.addEventListener('keydown', e => {
-  if ((e.ctrlKey || e.metaKey) && e.key === 'z' && !e.shiftKey) { e.preventDefault(); UndoStack.execute(); }
+  if ((e.ctrlKey || e.metaKey) && e.key === 'z' && !e.shiftKey) { e.preventDefault(); UndoStack?.execute(); }
 });
 
 // ── Excluir processo ──────────────────────────────────────────
