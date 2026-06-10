@@ -84,7 +84,18 @@ async function doLogin() {
   UndoStack.reset();
   injectLogoffMenu();
   injectUndoButton();
-  showPage('dashboard');
+
+  // Aguarda o boot terminar (carregamento do Sheets) antes de renderizar.
+  // Garante que aba anônima e novas máquinas vejam os dados imediatamente.
+  if (window._bootPromise) {
+    showPage('dashboard'); // mostra estrutura vazia imediatamente
+    window._bootPromise.then(() => {
+      // Re-renderiza após dados chegarem do Sheets
+      showPage('dashboard');
+    });
+  } else {
+    showPage('dashboard');
+  }
 }
 
 // Enter no campo de senha
