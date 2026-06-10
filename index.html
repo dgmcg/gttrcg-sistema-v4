@@ -545,6 +545,24 @@
   </div>
 </div>
 
+<!-- ══ CONFIGURAÇÃO EMBUTIDA — deve vir ANTES de todos os scripts JS ══ -->
+<script>
+// Define URL e token ANTES de db.js carregar,
+// para que o localStorage já esteja preenchido na aba anônima/nova máquina.
+const GTTRCG_CONFIG = {
+  appsScriptUrl: 'https://script.google.com/macros/s/AKfycbw2iLtPNMpUXtcImkRBORDMxjC_blqtRAyrlqtwxPuxbcCUS0cKDM-QERfWe0grWEwe/exec',
+  apiToken: 'dgmcg@2025',
+};
+(function() {
+  const url   = GTTRCG_CONFIG.appsScriptUrl;
+  const token = GTTRCG_CONFIG.apiToken;
+  const urlValida   = url   && !url.includes('COLE_AQUI')   && url.includes('script.google.com');
+  const tokenValido = token && !token.includes('COLE_AQUI') && token.length > 3;
+  if (urlValida)   { localStorage.setItem('gttrcg_apps_script_url', url); }
+  if (tokenValido) { localStorage.setItem('gttrcg_api_token', token); }
+})();
+</script>
+
 <!-- ══ SCRIPTS — ORDEM IMPORTA ════════════════════════════════════ -->
 <script src="js/utils.js"></script>
 <script src="js/db.js"></script>
@@ -559,22 +577,7 @@
 <script src="js/configuracoes.js"></script>
 <script src="js/modais.js"></script>
 
-<!-- ══ CONFIGURAÇÃO EMBUTIDA (produção) ══════════════════════════ -->
-<script>
-const GTTRCG_CONFIG = {
-  appsScriptUrl: 'https://script.google.com/macros/s/AKfycbw2iLtPNMpUXtcImkRBORDMxjC_blqtRAyrlqtwxPuxbcCUS0cKDM-QERfWe0grWEwe/exec',
-  apiToken: 'dgmcg@2025',
-};
-
-// Aplica configuração embutida automaticamente
-(function() {
-  const url = GTTRCG_CONFIG.appsScriptUrl;
-  const token = GTTRCG_CONFIG.apiToken;
-  const urlValida = url && !url.includes('COLE_AQUI') && url.includes('script.google.com');
-  const tokenValido = token && !token.includes('COLE_AQUI') && token.length > 3;
-  if (urlValida) { localStorage.setItem('gttrcg_apps_script_url', url); }
-  if (tokenValido) { localStorage.setItem('gttrcg_api_token', token); }
-})();
+<!-- GTTRCG_CONFIG movido para antes dos scripts JS -->
 
 // Botão Undo na topbar
 (function injectUndoBtn() {
