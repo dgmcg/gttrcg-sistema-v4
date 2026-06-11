@@ -48,54 +48,78 @@ async function doLogin() {
   const senhaVal = document.getElementById('login-pass').value;
   const errEl    = document.getElementById('login-error');
 
-  const users = ls('usuarios') || [];
-  const user  = users.find(u => u.login === loginVal);
+  // ── Fase 1: autenticação ─────────────────────────────────────
+  // Na primeira abertura _DB['usuarios'] está vazio.
+  // Nesse caso tentamos autenticar com o admin padrão (senha '123')
+  // para permitir o carregamento inicial dos dados.
+  let users = ls('usuarios') || [];
 
-  if (!user) { errEl.style.display = 'flex'; return; }
-
-  const ok = await verificarSenha(senhaVal, user.senha);
-  if (!ok)  { errEl.style.display = 'flex'; return; }
-
-  // Migra senha em texto puro para hash
-  if (!isHashed(user.senha)) {
-    const hashed = await hashSenha(senhaVal);
-    const allUsers = ls('usuarios') || [];
-    const idx = allUsers.findIndex(u => u.id === user.id);
-    if (idx >= 0) {
-      allUsers[idx].senha = hashed;
-      // Grava direto no localStorage para não triggar sync antes da sessão iniciar
-      localStorage.setItem('gttrcg_usuarios', JSON.stringify(allUsers));
+  // Sem usuários em memória: aceita admin/123 provisoriamente
+  // para que carregarDados() possa popular _DB com os dados reais
+  if (users.length === 0) {
+    if (loginVal !== 'admin') {
+      errEl.style.display = 'flex';
+      errEl.textContent = 'Aguardando conexão com o servidor. Tente novamente em instantes.';
+      return;
     }
+    // Permite continuar — o carregarDados() vai verificar a senha real depois
+  } else {
+    const user = users.find(u => u.login === loginVal);
+    if (!user) { errEl.style.display = 'flex'; errEl.textContent = 'Usuário ou senha inválidos.'; return; }
+    const ok = await verificarSenha(senhaVal, user.senha);
+    if (!ok)  { errEl.style.display = 'flex'; errEl.textContent = 'Usuário ou senha inválidos.'; return; }
   }
 
-  // Inicia sessão — NUNCA expõe a senha
-  APP.currentUser = { ...user, senha: undefined };
+  // ── Fase 2: esconde login e mostra loading ───────────────────
+  document.getElementById('login-screen').style.display = 'none';
   errEl.style.display = 'none';
 
-  // Atualiza topbar
-  document.getElementById('login-screen').style.display = 'none';
-  document.getElementById('user-name-display').textContent = user.nome;
-  document.getElementById('user-role-display').textContent =
-    user.perfil === 'admin' ? 'Administrador' : 'Usuário';
-  document.getElementById('user-avatar').textContent =
-    user.nome.charAt(0).toUpperCase();
+  // ── Fase 3: carrega todos os dados do Sheets ─────────────────
+  const dadosOk = await carregarDados();
+  if (!dadosOk) {
+    // carregarDados() já exibiu a tela de erro com botão "Tentar novamente"
+    document.getElementById('login-screen').style.display = 'flex';
+    return;
+  }
 
-  // Inicializa sistemas pós-login
+  // ── Fase 4: revalida com os dados reais do Sheets ────────────
+  users = ls('usuarios') || [];
+  const userReal = users.find(u => u.login === loginVal);
+  if (!userReal) {
+    document.getElementById('login-screen').style.display = 'flex';
+    errEl.style.display = 'flex';
+    errEl.textContent = 'Usuário não encontrado no sistema.';
+    return;
+  }
+  const senhaOk = await verificarSenha(senhaVal, userReal.senha);
+  if (!senhaOk) {
+    document.getElementById('login-screen').style.display = 'flex';
+    errEl.style.display = 'flex';
+    errEl.textContent = 'Usuário ou senha inválidos.';
+    return;
+  }
+
+  // Migra senha em texto puro para hash (gravação direta no Sheets via ls)
+  if (!isHashed(userReal.senha)) {
+    const hashed = await hashSenha(senhaVal);
+    const allUsers = ls('usuarios') || [];
+    const idx = allUsers.findIndex(u => u.id === userReal.id);
+    if (idx >= 0) { allUsers[idx].senha = hashed; ls('usuarios', allUsers); }
+  }
+
+  // ── Fase 5: inicia sessão ────────────────────────────────────
+  APP.currentUser = { ...userReal, senha: undefined };
+
+  document.getElementById('user-name-display').textContent = userReal.nome;
+  document.getElementById('user-role-display').textContent =
+    userReal.perfil === 'admin' ? 'Administrador' : 'Usuário';
+  document.getElementById('user-avatar').textContent =
+    userReal.nome.charAt(0).toUpperCase();
+
   UndoStack.reset();
   injectLogoffMenu();
   injectUndoButton();
-
-  // Aguarda o boot terminar (carregamento do Sheets) antes de renderizar.
-  // Garante que aba anônima e novas máquinas vejam os dados imediatamente.
-  if (window._bootPromise) {
-    showPage('dashboard'); // mostra estrutura vazia imediatamente
-    window._bootPromise.then(() => {
-      // Re-renderiza após dados chegarem do Sheets
-      showPage('dashboard');
-    });
-  } else {
-    showPage('dashboard');
-  }
+  showPage('dashboard');
 }
 
 // Enter no campo de senha
@@ -106,20 +130,7 @@ document.getElementById('login-pass')
 // MIGRAÇÃO AUTOMÁTICA DE SENHAS
 // ============================================================
 
-(async function migrarSenhas() {
-  const users = ls('usuarios') || [];
-  let changed = false;
-  for (const u of users) {
-    if (!isHashed(u.senha)) {
-      u.senha = await hashSenha(u.senha || '123');
-      changed = true;
-    }
-  }
-  if (changed) {
-    localStorage.setItem('gttrcg_usuarios', JSON.stringify(users));
-    console.log('[GTTRCG Auth] Senhas migradas para SHA-256 ✓');
-  }
-})();
+// Migração de senhas removida — dados vêm do Sheets, não do localStorage
 
 // ============================================================
 // PROTEÇÃO DO ADMIN MASTER
@@ -133,22 +144,23 @@ function isMasterProtected(targetUserId) {
   return target.login === 'admin' && APP.currentUser?.login !== 'admin';
 }
 
-/** Garante que o admin master sempre existe */
+/** Garante que o admin master existe em _DB (em memória) */
 function garantirAdminMaster() {
   const users  = ls('usuarios') || [];
   const master = users.find(u => u.login === 'admin');
   if (!master) {
+    // Insere admin padrão em memória — será sincronizado com Sheets ao salvar
     users.unshift({
       id: 'u_admin_master',
       nome: 'Administrador',
       login: 'admin',
-      senha: '123', // será migrado para hash na próxima execução
+      senha: '123',
       perfil: 'admin',
     });
-    localStorage.setItem('gttrcg_usuarios', JSON.stringify(users));
+    _DB['usuarios'] = users; // grava em RAM sem triggrar sync
   } else if (master.perfil !== 'admin') {
     master.perfil = 'admin';
-    localStorage.setItem('gttrcg_usuarios', JSON.stringify(users));
+    _DB['usuarios'] = users;
   }
 }
 
