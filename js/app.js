@@ -237,58 +237,17 @@ function filterSidebarFavoritos() {
 // BOOT DO SISTEMA
 // ============================================================
 
-async function bootSistema() {
+function bootSistema() {
   console.log('[GTTRCG] Iniciando sistema...');
 
-  // 1. Aplica GTTRCG_CONFIG embutido no HTML
-  if (typeof GTTRCG_CONFIG !== 'undefined') {
-    const { appsScriptUrl, apiToken } = GTTRCG_CONFIG;
-    if (appsScriptUrl && !appsScriptUrl.includes('COLE_AQUI')) {
-      setAppsScriptUrl(appsScriptUrl);
-    }
-    if (apiToken && !apiToken.includes('COLE_AQUI') && apiToken.length > 3) {
-      setApiToken(apiToken);
-    }
-  }
-
-  // 2. Verifica se há Sheets configurado
-  const sheetsUrl   = getAppsScriptUrl();
-  const sheetsToken = getApiToken();
-  const temSheets   = sheetsUrl && sheetsToken;
-
-  if (!temSheets) {
-    // Sem Sheets: inicializa dados padrão (primeiro uso)
-    console.log('[GTTRCG] Sem Sheets configurado — modo offline');
-    initData();
-    garantirAdminMaster();
-    if (typeof updateSidebarCounts === 'function') updateSidebarCounts();
-    if (typeof showSyncBadge === 'function') showSyncBadge('offline', 'URL não configurada');
-  } else {
-    // Com Sheets: garante admin master existe localmente
-    garantirAdminMaster();
-    // Carrega dados do Sheets
-    const ok = await iniciarDB();
-    if (ok) {
-      console.log('[GTTRCG] Dados carregados do Sheets ✓');
-      if (typeof updateSidebarCounts === 'function') updateSidebarCounts();
-      // Re-renderiza a página ativa caso o login tenha ocorrido antes
-      // dos dados chegarem — garante que aba anônima/nova máquina veja os dados
-      const paginaAtiva = document.querySelector('.page.active');
-      if (paginaAtiva && APP.currentUser) {
-        const pageId = paginaAtiva.id.replace('page-', '');
-        showPage(pageId);
-      }
-    } else {
-      console.warn('[GTTRCG] Falha ao carregar do Sheets — usando localStorage');
-      initData();
-    }
-  }
+  // Inicializa conexão com Sheets (configura URL/token, exibe botão de sync)
+  // O carregamento dos dados acontece em carregarDados(), chamado pelo doLogin()
+  iniciarDB();
+  garantirAdminMaster();
 
   console.log('[GTTRCG] Sistema pronto ✓');
 }
 
-// Inicia o sistema quando o DOM estiver pronto
-// Expõe a promise do boot para que o doLogin possa aguardá-la
-window._bootPromise = bootSistema();
+bootSistema();
 
 console.log('[GTTRCG] app.js carregado ✓');
