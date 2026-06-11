@@ -237,16 +237,34 @@ function filterSidebarFavoritos() {
 // BOOT DO SISTEMA
 // ============================================================
 
-function bootSistema() {
+async function bootSistema() {
   console.log('[GTTRCG] Iniciando sistema...');
 
-  // Inicializa conexão com Sheets (configura URL/token, exibe botão de sync)
-  // O carregamento dos dados acontece em carregarDados(), chamado pelo doLogin()
-  iniciarDB();
+  // 1. Carrega dados do Sheets ANTES de mostrar a tela de login
+  //    A tela de login fica escondida atrás do overlay de loading
+  const ok = await iniciarDB();
+
+  if (!ok) {
+    // iniciarDB() já exibiu a tela de erro — não faz mais nada
+    return;
+  }
+
+  // 2. Dados em memória — garante admin existe
   garantirAdminMaster();
+
+  // 3. Exibe a tela de login
+  const loginScreen = document.getElementById('login-screen');
+  if (loginScreen) loginScreen.style.display = 'flex';
 
   console.log('[GTTRCG] Sistema pronto ✓');
 }
+
+// Esconde a tela de login durante o carregamento inicial
+// (ela ficará visível só após iniciarDB() terminar)
+(function() {
+  const ls = document.getElementById('login-screen');
+  if (ls) ls.style.display = 'none';
+})();
 
 bootSistema();
 
