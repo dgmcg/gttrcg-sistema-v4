@@ -1,41 +1,47 @@
 // ============================================================
-// GTTRCG — db.js
-// ÚNICA camada de acesso a dados do sistema.
-// Responsabilidades:
-//   - Ler/gravar no localStorage (prefixo gttrcg_)
-//   - Sincronizar com Google Sheets via Apps Script
-//   - Badge de status de sincronização
-//   - Botão de sincronização manual
+// GTTRCG — db.js  (v5 — memória pura, sem localStorage)
 //
-// REGRA: Nenhum outro módulo acessa localStorage diretamente.
-//        Todo acesso passa por ls() ou as funções específicas.
+// ARQUITETURA:
+//   - Estado vive em RAM: objeto _DB (chave → valor)
+//   - Google Sheets é a única fonte de verdade
+//   - localStorage NÃO É USADO para dados de negócio
+//   - localStorage é usado APENAS para url/token de conexão
+//     (credenciais de configuração, não dados de negócio)
+//
+// API pública:
+//   ls(key)        → lê de _DB
+//   ls(key, val)   → grava em _DB e agenda escrita no Sheets
+//   genId()        → ID único
+//   carregarDados()→ busca tudo do Sheets, popula _DB, renderiza
+//   chamarAppsScript(params) → fetch com timeout/token
 // ============================================================
 
-// ── Configuração da conexão ──────────────────────────────────
-let GSHEET_URL   = localStorage.getItem('gttrcg_apps_script_url') || '';
-let GSHEET_TOKEN = localStorage.getItem('gttrcg_api_token')       || '';
+// ── Estado em memória ────────────────────────────────────────
+const _DB = {};
 
-// Timers de debounce por chave
+// ── Credenciais de conexão (únicas coisas no localStorage) ──
+let GSHEET_URL   = '';
+let GSHEET_TOKEN = '';
+
+// Timers de debounce por chave (para gravações)
 const _gravarTimers = {};
 
 // ============================================================
-// FUNÇÕES BASE DE localStorage
+// API DE DADOS — ls()
+// Todos os módulos lêem e gravam exclusivamente por aqui.
 // ============================================================
 
 /**
- * ls(key) — lê do localStorage
- * ls(key, val) — grava no localStorage E sincroniza com Sheets
+ * ls(key)       → lê _DB[key], retorna null se não existe
+ * ls(key, val)  → grava _DB[key] = val e agenda sync no Sheets
  */
 function ls(key, val) {
   if (val !== undefined) {
-    localStorage.setItem('gttrcg_' + key, JSON.stringify(val));
-    if (GSHEET_URL && GSHEET_TOKEN) {
-      gravarNoSheets(key, val);
-    }
+    _DB[key] = val;
+    _agendarGravacao(key, val);
     return val;
   }
-  const v = localStorage.getItem('gttrcg_' + key);
-  return v ? JSON.parse(v) : null;
+  return _DB[key] !== undefined ? _DB[key] : null;
 }
 
 /** Gera ID único */
@@ -44,69 +50,138 @@ function genId() {
 }
 
 // ============================================================
-// COMUNICAÇÃO COM APPS SCRIPT
+// CARREGAMENTO INICIAL — carregarDados()
+// Exibe loading, busca Sheets, popula _DB, renderiza.
 // ============================================================
 
 /**
- * Chama o Apps Script com timeout e tratamento de erros.
- * Leituras: GET com parâmetros na URL
- * Gravações: POST com JSON no body + token
+ * Chamado logo após o login.
+ * Bloqueia a UI com indicador de carregamento,
+ * busca todos os dados do Sheets, popula _DB
+ * e renderiza a interface.
  */
-async function chamarAppsScript(params) {
-  if (!GSHEET_URL) return null;
-
-  const controller = new AbortController();
-  const timeout = setTimeout(() => controller.abort(), 20000); // 20s
+async function carregarDados() {
+  _mostrarLoading(true);
 
   try {
-    const isWrite = ['set', 'analisarPdf'].includes(params.action);
-    let resp;
+    const data = await chamarAppsScript({ action: 'getAllData' });
 
-    if (isWrite) {
-      const payload = {
-        ...params,
-        token: GSHEET_TOKEN,
-        usuario: APP?.currentUser?.login || 'sistema',
-      };
-      resp = await fetch(GSHEET_URL, {
-        method: 'POST',
-        body: JSON.stringify(payload),
-        headers: { 'Content-Type': 'text/plain;charset=utf-8' },
-        signal: controller.signal,
-      });
-    } else {
-      const url = new URL(GSHEET_URL);
-      Object.entries(params).forEach(([k, v]) => {
-        url.searchParams.set(k, typeof v === 'object' ? JSON.stringify(v) : String(v));
-      });
-      resp = await fetch(url.toString(), { signal: controller.signal });
+    if (!data || data.error) {
+      _mostrarLoading(false);
+      _mostrarErroOffline(data?.error || 'Sem resposta do servidor');
+      return false;
     }
 
-    clearTimeout(timeout);
-    const text = await resp.text();
-    try {
-      return JSON.parse(text);
-    } catch (e) {
-      console.warn('[GTTRCG DB] Resposta não-JSON:', text.slice(0, 200));
-      return null;
-    }
+    // Popula _DB com os dados recebidos
+    // Ignora chaves com valor vazio para não apagar dados existentes em RAM
+    let importados = 0;
+    Object.entries(data).forEach(([key, val]) => {
+      if (val === null || val === undefined) return;
+      if (Array.isArray(val) && val.length === 0) return;
+      _DB[key] = val;
+      importados++;
+    });
+
+    console.log(`[GTTRCG DB] ${importados} coleções carregadas do Sheets`);
+    _mostrarLoading(false);
+    showSyncBadge('ok');
+    return true;
+
   } catch (e) {
-    clearTimeout(timeout);
-    if (e.name === 'AbortError') {
-      console.warn('[GTTRCG DB] Timeout (20s) na requisição');
-    } else {
-      console.warn('[GTTRCG DB] Erro de rede:', e.message);
-    }
-    return null;
+    console.warn('[GTTRCG DB] Erro ao carregar:', e.message);
+    _mostrarLoading(false);
+    _mostrarErroOffline('Falha de rede — verifique sua conexão');
+    return false;
   }
 }
 
-/**
- * Grava uma coleção no Sheets com debounce de 1.2s.
- * Nunca bloqueia a UI — falha silenciosamente com retry.
- */
-function gravarNoSheets(key, data) {
+// ── Indicador de carregamento ─────────────────────────────────
+
+function _mostrarLoading(visivel) {
+  let overlay = document.getElementById('db-loading-overlay');
+
+  if (!overlay) {
+    overlay = document.createElement('div');
+    overlay.id = 'db-loading-overlay';
+    overlay.style.cssText = [
+      'position:fixed', 'inset:0', 'background:var(--bg)',
+      'z-index:300', 'display:flex', 'flex-direction:column',
+      'align-items:center', 'justify-content:center', 'gap:16px',
+      'transition:opacity .3s',
+    ].join(';');
+    overlay.innerHTML = `
+      <div style="
+        width:40px;height:40px;border-radius:50%;
+        border:3px solid var(--border2);
+        border-top-color:var(--accent2);
+        animation:gttrcg-spin 1s linear infinite">
+      </div>
+      <div style="font-size:14px;color:var(--text2);font-weight:500">
+        Carregando dados...
+      </div>
+      <div style="font-size:12px;color:var(--text3)">
+        Conectando ao Google Sheets
+      </div>`;
+
+    // CSS da animação (injeta uma vez)
+    if (!document.getElementById('gttrcg-spin-style')) {
+      const style = document.createElement('style');
+      style.id = 'gttrcg-spin-style';
+      style.textContent = '@keyframes gttrcg-spin{to{transform:rotate(360deg)}}';
+      document.head.appendChild(style);
+    }
+
+    document.body.appendChild(overlay);
+  }
+
+  if (visivel) {
+    overlay.style.display = 'flex';
+    overlay.style.opacity = '1';
+  } else {
+    overlay.style.opacity = '0';
+    setTimeout(() => { overlay.style.display = 'none'; }, 300);
+  }
+}
+
+// ── Tela de erro offline ──────────────────────────────────────
+
+function _mostrarErroOffline(motivo) {
+  let overlay = document.getElementById('db-loading-overlay');
+  if (!overlay) return;
+
+  overlay.style.display = 'flex';
+  overlay.style.opacity = '1';
+  overlay.innerHTML = `
+    <div style="text-align:center;max-width:360px;padding:0 24px">
+      <div style="font-size:32px;margin-bottom:12px">⚠️</div>
+      <div style="font-size:16px;font-weight:600;color:var(--text);margin-bottom:8px">
+        Não foi possível carregar os dados
+      </div>
+      <div style="font-size:13px;color:var(--text3);margin-bottom:6px">
+        ${motivo}
+      </div>
+      <div style="font-size:12px;color:var(--text3);margin-bottom:24px;
+           background:var(--bg2);padding:10px;border-radius:var(--radius);
+           border:1px solid var(--border)">
+        O sistema requer conexão com o Google Sheets para funcionar.<br>
+        Nenhum dado é armazenado localmente neste dispositivo.
+      </div>
+      <button onclick="location.reload()" class="btn primary" style="width:100%;justify-content:center">
+        ↻ Tentar novamente
+      </button>
+    </div>`;
+}
+
+// ============================================================
+// GRAVAÇÃO NO SHEETS — agendada e debounced
+// ============================================================
+
+function _agendarGravacao(key, data) {
   if (!GSHEET_URL || !GSHEET_TOKEN) return;
+
+  // Não sincronizar chaves internas
+  const naoSincronizar = ['_sessao', '_cache'];
+  if (naoSincronizar.includes(key)) return;
 
   clearTimeout(_gravarTimers[key]);
   _gravarTimers[key] = setTimeout(async () => {
@@ -114,14 +189,12 @@ function gravarNoSheets(key, data) {
       const res = await chamarAppsScript({ action: 'set', sheet: key, data });
       if (res?.ok) {
         showSyncBadge('ok', 'Salvo às ' + new Date().toLocaleTimeString('pt-BR'));
-        console.log(`[GTTRCG DB] ✓ ${key} gravado no Sheets`);
       } else if (res?.error === 'TOKEN_INVALIDO') {
-        showSyncBadge('offline', 'Token inválido — verifique em Configurações');
+        showSyncBadge('offline', 'Token inválido');
       } else {
-        const msg = res?.error || 'falha';
-        showSyncBadge('offline', msg);
-        // Retry automático após 8s
-        setTimeout(() => gravarNoSheets(key, ls(key)), 8000);
+        showSyncBadge('offline', res?.error || 'Falha ao gravar');
+        // Retry em 8s
+        setTimeout(() => _agendarGravacao(key, _DB[key]), 8000);
       }
     } catch (e) {
       showSyncBadge('offline', 'Sem conexão');
@@ -129,66 +202,66 @@ function gravarNoSheets(key, data) {
   }, 1200);
 }
 
-/**
- * Carrega todos os dados do Sheets na inicialização.
- * NUNCA sobrescreve com dados vazios.
- * NUNCA grava de volta (evita loop).
- */
-async function carregarDoSheets() {
-  if (!GSHEET_URL) return false;
+// ============================================================
+// COMUNICAÇÃO COM APPS SCRIPT
+// ============================================================
+
+async function chamarAppsScript(params) {
+  if (!GSHEET_URL) return null;
+
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), 20000);
 
   try {
-    showSyncBadge('carregando');
-    const data = await chamarAppsScript({ action: 'getAllData' });
+    const isWrite = ['set', 'analisarPdf'].includes(params.action);
+    let resp;
 
-    if (!data || data.error) {
-      showSyncBadge('offline');
-      return false;
+    if (isWrite) {
+      resp = await fetch(GSHEET_URL, {
+        method: 'POST',
+        body: JSON.stringify({
+          ...params,
+          token: GSHEET_TOKEN,
+          usuario: APP?.currentUser?.login || 'sistema',
+        }),
+        headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+        signal: controller.signal,
+      });
+    } else {
+      const url = new URL(GSHEET_URL);
+      Object.entries(params).forEach(([k, v]) =>
+        url.searchParams.set(k, typeof v === 'object' ? JSON.stringify(v) : String(v))
+      );
+      resp = await fetch(url.toString(), { signal: controller.signal });
     }
 
-    let importados = 0;
-    Object.entries(data).forEach(([key, val]) => {
-      if (val === null || val === undefined) return;
-      if (Array.isArray(val) && val.length === 0) return;
-      if (typeof val === 'object' && !Array.isArray(val) && Object.keys(val).length === 0) return;
-      // Grava direto no localStorage SEM disparar sync
-      localStorage.setItem('gttrcg_' + key, JSON.stringify(val));
-      importados++;
-    });
+    clearTimeout(timeout);
+    const text = await resp.text();
+    try { return JSON.parse(text); }
+    catch { console.warn('[GTTRCG DB] Resposta não-JSON:', text.slice(0, 200)); return null; }
 
-    showSyncBadge('ok', `${importados} coleções carregadas`);
-    console.log(`[GTTRCG DB] ${importados} coleções importadas do Sheets`);
-    return true;
   } catch (e) {
-    console.warn('[GTTRCG DB] Erro ao carregar do Sheets:', e.message);
-    showSyncBadge('offline');
-    return false;
+    clearTimeout(timeout);
+    if (e.name !== 'AbortError') console.warn('[GTTRCG DB] Erro de rede:', e.message);
+    return null;
   }
 }
 
-/**
- * Testa a conexão com o Apps Script.
- * Retorna objeto com status e mensagem.
- */
 async function testarConexao() {
   try {
     const url = new URL(GSHEET_URL);
     url.searchParams.set('action', 'ping');
     const resp = await fetch(url.toString());
-    const text = await resp.text();
-    const data = JSON.parse(text);
-
-    if (data.error === 'TOKEN_INVALIDO') return { ok: false, msg: 'Token inválido' };
-    if (data.error) return { ok: false, msg: data.error };
+    const data = JSON.parse(await resp.text());
     if (data.ok) return { ok: true, msg: `Conectado · ${new Date(data.ts).toLocaleTimeString('pt-BR')}` };
-    return { ok: false, msg: 'Resposta inesperada' };
+    return { ok: false, msg: data.error || 'Resposta inesperada' };
   } catch (e) {
     return { ok: false, msg: e.message };
   }
 }
 
 // ============================================================
-// BADGE DE SINCRONIZAÇÃO
+// BADGE DE STATUS E BOTÃO DE SINCRONIZAÇÃO
 // ============================================================
 
 function showSyncBadge(estado, detalhe) {
@@ -196,51 +269,37 @@ function showSyncBadge(estado, detalhe) {
   if (!badge) {
     badge = document.createElement('div');
     badge.id = 'sync-badge';
-    badge.style.cssText = [
-      'position:fixed', 'bottom:14px', 'left:14px',
-      'font-size:11px', 'padding:4px 10px', 'border-radius:20px',
-      'z-index:90', 'transition:all .3s', 'pointer-events:none',
-    ].join(';');
+    badge.style.cssText = 'position:fixed;bottom:14px;left:14px;font-size:11px;padding:4px 10px;border-radius:20px;z-index:90;transition:all .3s;pointer-events:none';
     document.body.appendChild(badge);
   }
+  const cfg = {
+    ok:         { bg:'rgba(63,185,80,.12)',  cor:'var(--green)',   txt:'● Sheets sincronizado' },
+    offline:    { bg:'rgba(210,153,34,.12)', cor:'var(--yellow2)', txt:'⚠ Sem sincronização' },
+    carregando: { bg:'rgba(31,111,235,.1)',  cor:'var(--accent2)', txt:'↻ Carregando...' },
+  }[estado] || { bg:'rgba(210,153,34,.12)', cor:'var(--yellow2)', txt:'⚠' };
 
-  const configs = {
-    ok:         { bg: 'rgba(63,185,80,.12)',  cor: 'var(--green)',   txt: '● Sheets sincronizado' },
-    offline:    { bg: 'rgba(210,153,34,.12)', cor: 'var(--yellow2)', txt: '⚠ Modo offline' },
-    carregando: { bg: 'rgba(31,111,235,.1)',  cor: 'var(--accent2)', txt: '↻ Conectando...' },
-  };
-
-  const cfg = configs[estado] || configs.offline;
   badge.style.background = cfg.bg;
   badge.style.color = cfg.cor;
   badge.style.border = `1px solid ${cfg.cor}44`;
   badge.textContent = detalhe ? `${cfg.txt} · ${detalhe}` : cfg.txt;
 }
 
-// ============================================================
-// BOTÃO DE SINCRONIZAÇÃO MANUAL
-// ============================================================
-
 function addSyncButton() {
   if (document.getElementById('sync-btn')) return;
-
   const btn = document.createElement('button');
   btn.id = 'sync-btn';
   btn.className = 'btn';
   btn.style.cssText = 'position:fixed;bottom:14px;right:14px;z-index:90;font-size:11px;padding:4px 12px';
   btn.innerHTML = '↻ Sincronizar';
-  btn.title = 'Recarregar dados do Google Sheets';
+  btn.title = 'Recarregar todos os dados do Google Sheets';
   btn.onclick = async () => {
     btn.textContent = '…';
     btn.disabled = true;
-    const ok = await carregarDoSheets();
+    const ok = await carregarDados();
     if (ok) {
-      // Recarrega a view ativa
       const activePage = document.querySelector('.page.active')?.id?.replace('page-', '');
       if (activePage && typeof showPage === 'function') showPage(activePage);
-      showToast('✓ Dados sincronizados do Google Sheets!');
-    } else {
-      showToast('⚠ Não foi possível conectar ao Sheets');
+      showToast('✓ Dados sincronizados!');
     }
     btn.innerHTML = '↻ Sincronizar';
     btn.disabled = false;
@@ -249,7 +308,8 @@ function addSyncButton() {
 }
 
 // ============================================================
-// CONFIGURAÇÃO DA CONEXÃO
+// CONFIGURAÇÃO DE CONEXÃO
+// Credenciais ficam em localStorage (não são dados de negócio)
 // ============================================================
 
 function setAppsScriptUrl(url) {
@@ -263,39 +323,47 @@ function setApiToken(token) {
 }
 
 function getAppsScriptUrl() { return GSHEET_URL; }
-function getApiToken() { return GSHEET_TOKEN; }
+function getApiToken()      { return GSHEET_TOKEN; }
+
+// ── Lê credenciais do localStorage (única leitura de LS) ─────
+(function _carregarCredenciais() {
+  GSHEET_URL   = localStorage.getItem('gttrcg_apps_script_url') || '';
+  GSHEET_TOKEN = localStorage.getItem('gttrcg_api_token')       || '';
+})();
+
+// ── Aplica GTTRCG_CONFIG se já disponível ───────────────────
+// (normalmente já está, pois o bloco inline vem antes dos scripts)
+(function _aplicarConfig() {
+  if (typeof GTTRCG_CONFIG === 'undefined') return;
+  const { appsScriptUrl, apiToken } = GTTRCG_CONFIG;
+  if (appsScriptUrl && !appsScriptUrl.includes('COLE_AQUI') && appsScriptUrl.includes('script.google.com')) {
+    setAppsScriptUrl(appsScriptUrl);
+  }
+  if (apiToken && !apiToken.includes('COLE_AQUI') && apiToken.length > 3) {
+    setApiToken(apiToken);
+  }
+})();
 
 // ============================================================
-// INICIALIZAÇÃO DA SINCRONIZAÇÃO
+// INICIALIZAÇÃO
 // ============================================================
 
 /**
- * Inicializa a camada de dados.
- * Chamado pelo app.js no boot do sistema.
- * Se URL e token configurados: carrega do Sheets.
- * Caso contrário: usa localStorage existente.
+ * iniciarDB() — chamado pelo bootSistema() no app.js
+ * Configura a conexão e retorna true se URL/token presentes.
+ * O carregamento real dos dados é feito por carregarDados(),
+ * chamado pelo doLogin() após autenticação.
  */
-async function iniciarDB() {
-  // Aplica configuração embutida no HTML (GTTRCG_CONFIG)
-  if (typeof GTTRCG_CONFIG !== 'undefined') {
-    const { appsScriptUrl, apiToken } = GTTRCG_CONFIG;
-    if (appsScriptUrl && !appsScriptUrl.includes('COLE_AQUI')) {
-      setAppsScriptUrl(appsScriptUrl);
-    }
-    if (apiToken && !apiToken.includes('COLE_AQUI') && apiToken.length > 3) {
-      setApiToken(apiToken);
-    }
-  }
-
+function iniciarDB() {
   addSyncButton();
 
-  if (!GSHEET_URL) {
-    showSyncBadge('offline', 'URL não configurada');
+  if (!GSHEET_URL || !GSHEET_TOKEN) {
+    showSyncBadge('offline', 'URL ou token não configurados');
     return false;
   }
 
-  const ok = await carregarDoSheets();
-  return ok;
+  showSyncBadge('ok', 'Pronto');
+  return true;
 }
 
 console.log('[GTTRCG] db.js carregado ✓');
