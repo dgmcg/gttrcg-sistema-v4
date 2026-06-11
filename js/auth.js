@@ -48,81 +48,47 @@ async function doLogin() {
   const senhaVal = document.getElementById('login-pass').value;
   const errEl    = document.getElementById('login-error');
 
-  // ── Fase 1: autenticação ─────────────────────────────────────
-  // Na primeira abertura _DB['usuarios'] está vazio.
-  // Nesse caso tentamos autenticar com o admin padrão (senha '123')
-  // para permitir o carregamento inicial dos dados.
-  let users = ls('usuarios') || [];
+  // _DB já foi populado pelo iniciarDB() antes desta tela aparecer
+  const users = ls('usuarios') || [];
+  const user  = users.find(u => u.login === loginVal);
 
-  // Sem usuários em memória: aceita admin/123 provisoriamente
-  // para que carregarDados() possa popular _DB com os dados reais
-  if (users.length === 0) {
-    if (loginVal !== 'admin') {
-      errEl.style.display = 'flex';
-      errEl.textContent = 'Aguardando conexão com o servidor. Tente novamente em instantes.';
-      return;
-    }
-    // Permite continuar — o carregarDados() vai verificar a senha real depois
-  } else {
-    const user = users.find(u => u.login === loginVal);
-    if (!user) { errEl.style.display = 'flex'; errEl.textContent = 'Usuário ou senha inválidos.'; return; }
-    const ok = await verificarSenha(senhaVal, user.senha);
-    if (!ok)  { errEl.style.display = 'flex'; errEl.textContent = 'Usuário ou senha inválidos.'; return; }
-  }
-
-  // ── Fase 2: esconde login e mostra loading ───────────────────
-  document.getElementById('login-screen').style.display = 'none';
-  errEl.style.display = 'none';
-
-  // ── Fase 3: carrega todos os dados do Sheets ─────────────────
-  const dadosOk = await carregarDados();
-  if (!dadosOk) {
-    // carregarDados() já exibiu a tela de erro com botão "Tentar novamente"
-    document.getElementById('login-screen').style.display = 'flex';
-    return;
-  }
-
-  // ── Fase 4: revalida com os dados reais do Sheets ────────────
-  users = ls('usuarios') || [];
-  const userReal = users.find(u => u.login === loginVal);
-  if (!userReal) {
-    document.getElementById('login-screen').style.display = 'flex';
-    errEl.style.display = 'flex';
-    errEl.textContent = 'Usuário não encontrado no sistema.';
-    return;
-  }
-  const senhaOk = await verificarSenha(senhaVal, userReal.senha);
-  if (!senhaOk) {
-    document.getElementById('login-screen').style.display = 'flex';
+  if (!user) {
     errEl.style.display = 'flex';
     errEl.textContent = 'Usuário ou senha inválidos.';
     return;
   }
 
-  // Migra senha em texto puro para hash (gravação direta no Sheets via ls)
-  if (!isHashed(userReal.senha)) {
+  const ok = await verificarSenha(senhaVal, user.senha);
+  if (!ok) {
+    errEl.style.display = 'flex';
+    errEl.textContent = 'Usuário ou senha inválidos.';
+    return;
+  }
+
+  // Migra senha em texto puro para hash se necessário
+  if (!isHashed(user.senha)) {
     const hashed = await hashSenha(senhaVal);
     const allUsers = ls('usuarios') || [];
-    const idx = allUsers.findIndex(u => u.id === userReal.id);
+    const idx = allUsers.findIndex(u => u.id === user.id);
     if (idx >= 0) { allUsers[idx].senha = hashed; ls('usuarios', allUsers); }
   }
 
-  // ── Fase 5: inicia sessão ────────────────────────────────────
-  APP.currentUser = { ...userReal, senha: undefined };
-
-  document.getElementById('user-name-display').textContent = userReal.nome;
+  // Inicia sessão
+  APP.currentUser = { ...user, senha: undefined };
+  errEl.style.display = 'none';
+  document.getElementById('login-screen').style.display = 'none';
+  document.getElementById('user-name-display').textContent = user.nome;
   document.getElementById('user-role-display').textContent =
-    userReal.perfil === 'admin' ? 'Administrador' : 'Usuário';
+    user.perfil === 'admin' ? 'Administrador' : 'Usuário';
   document.getElementById('user-avatar').textContent =
-    userReal.nome.charAt(0).toUpperCase();
+    user.nome.charAt(0).toUpperCase();
 
   UndoStack.reset();
   injectLogoffMenu();
   injectUndoButton();
+  if (typeof updateSidebarCounts === 'function') updateSidebarCounts();
   showPage('dashboard');
 }
-
-// Enter no campo de senha
 document.getElementById('login-pass')
   .addEventListener('keydown', e => { if (e.key === 'Enter') doLogin(); });
 
