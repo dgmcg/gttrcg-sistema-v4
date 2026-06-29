@@ -88,6 +88,11 @@ async function doLogin() {
   injectUndoButton();
   if (typeof updateSidebarCounts === 'function') updateSidebarCounts();
   showPage('dashboard');
+
+  // Exibe o modal de novidades se esta versão ainda não foi vista pelo usuário
+  if (typeof verificarNovidades === 'function') {
+    setTimeout(() => verificarNovidades(user), 400);
+  }
 }
 document.getElementById('login-pass')
   .addEventListener('keydown', e => { if (e.key === 'Enter') doLogin(); });
