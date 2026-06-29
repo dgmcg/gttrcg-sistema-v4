@@ -377,7 +377,6 @@ function openDetalhe(id) {
           <div class="etapa-fields">`;
 
       (e.campos || []).forEach(campo => {
-        if (campo.tipo === 'pdf') return; // PDF tratado à parte
         const fid = `ef_${e.id}_${campo.label.replace(/\s+/g, '_')}`;
         const val = acomp[campo.label] !== undefined ? acomp[campo.label] : '';
 
@@ -399,6 +398,8 @@ function openDetalhe(id) {
             </select></div>`;
         } else if (campo.tipo === 'moeda') {
           html += `<div class="etapa-field"><label>${campo.label}</label><input type="number" step="0.01" id="${fid}" data-etapa="${e.id}" data-campo="${campo.label}" value="${val}" placeholder="0,00"></div>`;
+        } else if (campo.tipo === 'pdf') {
+          html += renderCampoDocumento(e.id, campo, val, id);
         } else {
           html += `<div class="etapa-field"><label>${campo.label}</label><input type="text" id="${fid}" data-etapa="${e.id}" data-campo="${campo.label}" value="${val}" placeholder="${campo.label}"></div>`;
         }
@@ -509,6 +510,147 @@ function renderLinhaDoTempo(p, etapas) {
 }
 
 // ── Helpers de etapa ─────────────────────────────────────────
+// ── CAMPO TIPO DOCUMENTO (upload de arquivo para o Drive) ─────
+/**
+ * Renderiza o widget de upload para campos tipo 'pdf'.
+ * O valor salvo no acompanhamento é um JSON string:
+ * { url, nome, tamanho } — ou vazio se nada foi enviado ainda.
+ */
+function renderCampoDocumento(etapaId, campo, valorAtual, procId) {
+  const fid = `ef_${etapaId}_${campo.label.replace(/\s+/g, '_')}`;
+  let arquivo = null;
+  if (valorAtual) {
+    try { arquivo = JSON.parse(valorAtual); } catch { arquivo = null; }
+  }
+
+  return `<div class="etapa-field etapa-field-doc" style="grid-column:1/-1">
+    <label>${campo.label}</label>
+    <input type="hidden" id="${fid}" data-etapa="${etapaId}" data-campo="${campo.label}" value="${valorAtual ? valorAtual.replace(/"/g, '&quot;') : ''}">
+    <div id="${fid}_wrap" style="display:flex;align-items:center;gap:10px;flex-wrap:wrap">
+      ${arquivo ? `
+        <a href="${arquivo.url}" target="_blank" rel="noopener" class="btn sm" style="text-decoration:none">
+          <svg viewBox="0 0 16 16" fill="currentColor" width="13" height="13"><path d="M9.293 0H4a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h8a2 2 0 0 0 2-2V4.707A1 1 0 0 0 13.707 4L10 .293A1 1 0 0 0 9.293 0zM9.5 3.5v-2l3 3h-2a1 1 0 0 1-1-1z"/></svg>
+          ${arquivo.nome}
+        </a>
+        <span style="font-size:11px;color:var(--text3)">${fmtTamanhoArquivo(arquivo.tamanho)}</span>
+        <button type="button" class="btn sm danger" onclick="removerDocumentoEtapa('${etapaId}','${campo.label.replace(/'/g, "\\'")}')">Remover</button>
+      ` : `
+        <label class="btn sm" style="cursor:pointer">
+          <svg viewBox="0 0 16 16" fill="currentColor" width="13" height="13"><path d="M.5 9.9a.5.5 0 0 1 .5.5v2.5a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1v-2.5a.5.5 0 0 1 1 0v2.5a2 2 0 0 1-2 2H2a2 2 0 0 1-2-2v-2.5a.5.5 0 0 1 .5-.5zM7.646.146a.5.5 0 0 1 .708 0l3 3a.5.5 0 0 1-.708.708L8.5 1.707V11.5a.5.5 0 0 1-1 0V1.707L5.354 3.854a.5.5 0 1 1-.708-.708l3-3z"/></svg>
+          Selecionar arquivo
+          <input type="file" style="display:none" onchange="handleUploadDocumento(this,'${procId}','${etapaId}','${campo.label.replace(/'/g, "\\'")}')">
+        </label>
+        <span id="${fid}_status" style="font-size:11px;color:var(--text3)"></span>
+      `}
+    </div>
+  </div>`;
+}
+
+function fmtTamanhoArquivo(bytes) {
+  if (!bytes) return '';
+  if (bytes < 1024) return bytes + ' B';
+  if (bytes < 1024 * 1024) return (bytes / 1024).toFixed(0) + ' KB';
+  return (bytes / (1024 * 1024)).toFixed(1) + ' MB';
+}
+
+/**
+ * Lê o arquivo escolhido, converte para base64 e envia ao Apps Script
+ * (action: uploadArquivo). Ao receber a URL do Drive, atualiza o input
+ * hidden do campo e re-renderiza o widget — sem precisar clicar em
+ * "Salvar Acompanhamento" para o upload em si (mas o link só persiste
+ * de fato no processo quando o acompanhamento for salvo, como qualquer
+ * outro campo).
+ */
+async function handleUploadDocumento(inputEl, procId, etapaId, campoLabel) {
+  const file = inputEl.files?.[0];
+  if (!file) return;
+
+  const fid = `ef_${etapaId}_${campoLabel.replace(/\s+/g, '_')}`;
+  const statusEl = document.getElementById(`${fid}_status`);
+  const hiddenEl = document.getElementById(fid);
+
+  // Limite de segurança no navegador antes de gastar tempo subindo
+  const LIMITE_MB = 20;
+  if (file.size > LIMITE_MB * 1024 * 1024) {
+    showToast(`Arquivo muito grande (máx. ${LIMITE_MB}MB). Escolha um arquivo menor.`);
+    inputEl.value = '';
+    return;
+  }
+
+  if (statusEl) statusEl.textContent = 'Enviando ' + file.name + '...';
+
+  try {
+    const base64 = await new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onload = () => resolve(reader.result.split(',')[1]);
+      reader.onerror = reject;
+      reader.readAsDataURL(file);
+    });
+
+    const res = await chamarAppsScript({
+      action: 'uploadArquivo',
+      arquivoBase64: base64,
+      filename: file.name,
+      mimeType: file.type || 'application/octet-stream',
+      processoId: procId,
+      etapaId,
+    });
+
+    if (!res?.ok) {
+      showToast('Falha no upload: ' + (res?.error || 'erro desconhecido'));
+      if (statusEl) statusEl.textContent = '';
+      return;
+    }
+
+    const valorCampo = JSON.stringify({ url: res.url, nome: file.name, tamanho: res.tamanho });
+    if (hiddenEl) hiddenEl.value = valorCampo;
+
+    // Persiste imediatamente no processo — não depende do botão
+    // "Salvar Acompanhamento", pois o arquivo já foi enviado ao Drive
+    // e seria confuso perder a referência se o usuário fechar o modal.
+    const processos = ls('processos') || [];
+    const pIdx = processos.findIndex(p => p.id === procId);
+    if (pIdx >= 0) {
+      if (!processos[pIdx].acompanhamento) processos[pIdx].acompanhamento = {};
+      if (!processos[pIdx].acompanhamento[etapaId]) processos[pIdx].acompanhamento[etapaId] = {};
+      processos[pIdx].acompanhamento[etapaId][campoLabel] = valorCampo;
+      ls('processos', processos);
+    }
+
+    // Re-renderiza o widget completo (label + link + botão remover)
+    const container = document.getElementById(`${fid}_wrap`)?.closest('.etapa-field-doc');
+    if (container) {
+      container.outerHTML = renderCampoDocumento(etapaId, { label: campoLabel, tipo: 'pdf' }, valorCampo, procId);
+    }
+
+    showToast('✓ Documento enviado e salvo: ' + file.name);
+  } catch (err) {
+    showToast('Erro ao enviar arquivo: ' + err.message);
+    if (statusEl) statusEl.textContent = '';
+  }
+}
+
+function removerDocumentoEtapa(etapaId, campoLabel) {
+  if (!confirm('Remover este documento do campo? (o arquivo continua no Drive, apenas o vínculo é removido)')) return;
+  const fid = `ef_${etapaId}_${campoLabel.replace(/\s+/g, '_')}`;
+  const hiddenEl = document.getElementById(fid);
+  if (hiddenEl) hiddenEl.value = '';
+
+  const procId = APP.currentProcessoId;
+  const processos = ls('processos') || [];
+  const pIdx = processos.findIndex(p => p.id === procId);
+  if (pIdx >= 0 && processos[pIdx].acompanhamento?.[etapaId]) {
+    processos[pIdx].acompanhamento[etapaId][campoLabel] = '';
+    ls('processos', processos);
+  }
+
+  const container = document.getElementById(`${fid}_wrap`)?.closest('.etapa-field-doc');
+  if (container) {
+    container.outerHTML = renderCampoDocumento(etapaId, { label: campoLabel, tipo: 'pdf' }, '', procId);
+  }
+  showToast('Documento removido do campo.');
+}
+
 function toggleEtapa(id) {
   document.getElementById('etapa-body-' + id)?.classList.toggle('open');
 }
