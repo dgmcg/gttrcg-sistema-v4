@@ -418,6 +418,20 @@ tbody td { padding: 10px 12px; vertical-align: middle; color: var(--text); }
 .fluxo-connector      { display: flex; align-items: center; padding: 0 18px; margin-bottom: 6px; }
 .fluxo-connector-line { width: 1px; height: 16px; background: var(--border2); margin: 0 auto; }
 
+/* Drag & drop de reordenação de etapas */
+.fluxo-nodes-dropzone { display: flex; flex-direction: column; }
+.fluxo-drag-handle {
+  cursor: grab; color: var(--text3); font-size: 14px; line-height: 1;
+  flex-shrink: 0; padding: 2px 4px; user-select: none; align-self: center;
+}
+.fluxo-drag-handle:active { cursor: grabbing; }
+.fluxo-node.dragging { opacity: .4; }
+.fluxo-node.drag-over {
+  border-color: var(--accent2);
+  box-shadow: 0 0 0 2px var(--accent2) inset;
+  background: var(--bg2);
+}
+
 /* ── ETAPAS ACOMPANHAMENTO ── */
 .etapas-list { display: flex; flex-direction: column; gap: 8px; }
 .etapa-item {
