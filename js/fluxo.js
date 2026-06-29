@@ -115,7 +115,7 @@ function renderFluxo() {
 
   // Esconde botões admin para não-admin
   if (!isAdmin) {
-    document.querySelectorAll('[onclick="openAdicionarEtapa()"], [onclick="openEditarFluxo()"]').forEach(b => b.style.display = 'none');
+    document.querySelectorAll('[onclick="openAdicionarEtapa()"]').forEach(b => b.style.display = 'none');
   }
 }
 
@@ -125,11 +125,16 @@ function salvarEtapaFluxo() {
   if (!nome) { alert('Informe o nome da etapa!'); return; }
   const etapas = ls('etapasFluxo') || [];
   const id = document.getElementById('etapa-id-edit').value || genId();
-  const camposRaw = document.getElementById('etapa-campos-edit').value.trim().split('\n').filter(Boolean);
-  const campos = camposRaw.map(r => {
-    const [tipo, ...rest] = r.split('|');
-    return { tipo: tipo.trim(), label: rest.join('|').trim() };
-  }).filter(c => c.tipo && c.label);
+
+  // Campos vêm do editor visual (_camposEtapaEdit, definido em modais.js)
+  const campos = (_camposEtapaEdit || [])
+    .filter(c => c.label && c.label.trim())
+    .map(c => {
+      const limpo = { tipo: c.tipo || 'text', label: c.label.trim() };
+      if (c.tipo === 'listafixo' && c.listaFonte) limpo.listaFonte = c.listaFonte;
+      return limpo;
+    });
+
   const obj = {
     id, nome,
     fase: document.getElementById('etapa-fase-edit').value,
