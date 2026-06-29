@@ -192,7 +192,7 @@ async function chamarAppsScript(params) {
   const timeout = setTimeout(() => controller.abort(), 25000);
 
   try {
-    const isWrite = ['set', 'analisarPdf'].includes(params.action);
+    const isWrite = ['set', 'analisarPdf', 'uploadArquivo'].includes(params.action);
     let resp;
 
     if (isWrite) {
