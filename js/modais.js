@@ -241,13 +241,24 @@ function openAdicionarEtapa() {
   ['etapa-nome-edit', 'etapa-resp-edit', 'etapa-acao-edit'].forEach(id => {
     const el = document.getElementById(id); if (el) el.value = '';
   });
-  document.getElementById('etapa-ordem-edit').value = '';
   document.getElementById('etapa-fase-edit').value = 'planejamento';
   _populateSubfaseSelect('');
   _camposEtapaEdit = [];
   renderListaCamposEtapa();
+  _sugerirProximaPosicao('planejamento');
   document.getElementById('btn-excluir-etapa').style.display = 'none';
   openModal('modal-etapa-fluxo');
+}
+
+// Sugere a próxima posição livre (última + 1) da fase selecionada.
+// Atualizado automaticamente quando o admin troca a fase no select.
+function _sugerirProximaPosicao(faseKey) {
+  const ordemEl = document.getElementById('etapa-ordem-edit');
+  if (!ordemEl) return;
+  const etapas = ls('etapasFluxo') || [];
+  const doGrupo = etapas.filter(e => e.fase === faseKey);
+  ordemEl.value = doGrupo.length + 1;
+  ordemEl.max = doGrupo.length + 1;
 }
 
 function editarEtapaFluxo(id) {
@@ -352,6 +363,15 @@ function moverCampoEtapa(idx, direcao) {
 function removerCampoEtapa(idx) {
   _camposEtapaEdit.splice(idx, 1);
   renderListaCamposEtapa();
+}
+
+// Chamado pelo onchange do select de fase no modal de etapa.
+// Em modo "Nova Etapa" (sem id), atualiza a sugestão de posição.
+// Em modo edição, não altera nada — o admin decide manualmente.
+function onTrocarFaseEtapaEdit(faseKey) {
+  const idAtual = document.getElementById('etapa-id-edit')?.value;
+  if (!idAtual) _sugerirProximaPosicao(faseKey);
+  _populateSubfaseSelect(document.getElementById('etapa-subfase-edit')?.value || '');
 }
 
 function _populateSubfaseSelect(currentVal) {
