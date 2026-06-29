@@ -228,7 +228,7 @@ const TIPOS_CAMPO_ETAPA = [
   { value: 'date',      label: 'Data' },
   { value: 'moeda',     label: 'Valor (R$)' },
   { value: 'listafixo', label: 'Lista Fixa (dados fixos)' },
-  { value: 'pdf',       label: 'Documento PDF' },
+  { value: 'pdf',       label: 'Anexo de Documento' },
 ];
 
 // Estado em memória dos campos sendo editados no modal (array de {tipo,label,listaFonte})
