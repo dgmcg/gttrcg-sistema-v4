@@ -72,6 +72,70 @@ function atualizarFaseProcesso(procId) {
   }
 }
 
+// ── REORDENAÇÃO AUTOMÁTICA DE ETAPAS DENTRO DA FASE ───────────
+/**
+ * Recebe o array completo de etapas e GARANTE que, dentro de cada
+ * fase, a propriedade `ordem` forma uma sequência contínua 1,2,3...
+ * sem buracos e sem duplicatas, respeitando a ordem relativa atual
+ * (sort estável por ordem, depois por posição no array).
+ * Não precisa saber se algo foi inserido/removido/movido — só
+ * recalcula a sequência a partir do estado atual.
+ */
+function renumerarEtapasPorFase(etapas) {
+  const fasesPresentes = [...new Set(etapas.map(e => e.fase))];
+  fasesPresentes.forEach(faseKey => {
+    const doGrupo = etapas
+      .filter(e => e.fase === faseKey)
+      .sort((a, b) => (a.ordem || 0) - (b.ordem || 0));
+    doGrupo.forEach((e, i) => { e.ordem = i + 1; });
+  });
+  return etapas;
+}
+
+/**
+ * Insere/atualiza uma etapa numa posição alvo dentro de sua fase,
+ * empurrando as demais etapas daquela fase para abrir espaço, e
+ * renumera tudo em sequência contínua ao final.
+ *
+ * etapaObj.ordem é tratado como a posição DESEJADA (1-based).
+ * Se a etapa já existe (mesmo id), ela é removida do array antes
+ * de ser reinserida na nova posição — isso cobre tanto edição
+ * quanto mudança de fase ou de posição.
+ */
+function inserirEtapaComReordenacao(etapas, etapaObj) {
+  // Remove a versão antiga da etapa (se for edição) para reinserir limpo
+  const semEla = etapas.filter(e => e.id !== etapaObj.id);
+
+  // Etapas da MESMA fase de destino, na ordem atual
+  const doGrupo = semEla
+    .filter(e => e.fase === etapaObj.fase)
+    .sort((a, b) => (a.ordem || 0) - (b.ordem || 0));
+
+  // Posição desejada (1-based), limitada ao intervalo válido [1, n+1]
+  const posDesejada = Math.max(1, Math.min(etapaObj.ordem || (doGrupo.length + 1), doGrupo.length + 1));
+
+  // Insere a etapa na posição desejada dentro do grupo da fase
+  doGrupo.splice(posDesejada - 1, 0, etapaObj);
+
+  // Renumera o grupo em sequência contínua
+  doGrupo.forEach((e, i) => { e.ordem = i + 1; });
+
+  // Reconstrói o array completo: etapas de outras fases + grupo atualizado
+  const outrasFases = semEla.filter(e => e.fase !== etapaObj.fase);
+  return [...outrasFases, ...doGrupo];
+}
+
+/**
+ * Remove uma etapa pelo id e renumera as demais da mesma fase
+ * para fechar o buraco automaticamente.
+ */
+function removerEtapaComReordenacao(etapas, etapaId) {
+  const alvo = etapas.find(e => e.id === etapaId);
+  const restantes = etapas.filter(e => e.id !== etapaId);
+  if (!alvo) return restantes;
+  return renumerarEtapasPorFase(restantes);
+}
+
 // ── RENDERIZAR FLUXO (visão geral) ────────────────────────────
 function renderFluxo() {
   const etapas = ls('etapasFluxo') || [];
@@ -84,14 +148,16 @@ function renderFluxo() {
   let html = '<div class="fluxo-visual">';
   fases.forEach(f => {
     const et = etapas.filter(e => e.fase === f.key).sort((a, b) => (a.ordem || 0) - (b.ordem || 0));
-    html += `<div class="fluxo-group">
+    html += `<div class="fluxo-group" data-fase="${f.key}">
       <div class="fluxo-group-title" style="color:${f.color};border-left:3px solid ${f.color};padding-left:10px">
         ${f.label}
         <span style="margin-left:auto;font-size:10px;color:var(--text3)">${et.length} etapas</span>
-      </div>`;
+      </div>
+      <div class="fluxo-nodes-dropzone" data-fase="${f.key}">`;
     et.forEach((e, i) => {
       const onclick = isAdmin ? `editarEtapaFluxo('${e.id}')` : '';
-      html += `<div class="fluxo-node" ${onclick ? `onclick="${onclick}"` : ''} style="${!isAdmin ? 'cursor:default' : ''}">
+      html += `<div class="fluxo-node" data-etapa-id="${e.id}" data-fase="${f.key}" ${isAdmin ? 'draggable="true"' : ''} ${onclick ? `onclick="${onclick}"` : ''} style="${!isAdmin ? 'cursor:default' : ''}">
+        ${isAdmin ? `<div class="fluxo-drag-handle" title="Arrastar para reordenar" onclick="event.stopPropagation()">⠿</div>` : ''}
         <div class="fluxo-node-icon" style="background:${f.color}22;color:${f.color};font-size:11px;font-weight:700">${e.ordem}</div>
         <div class="fluxo-node-content">
           <div class="fluxo-node-title">${e.nome}</div>
@@ -108,7 +174,7 @@ function renderFluxo() {
       </div>`;
       if (i < et.length - 1) html += '<div class="fluxo-connector"><div class="fluxo-connector-line"></div></div>';
     });
-    html += '</div>';
+    html += '</div></div>';
   });
   html += '</div>';
   document.getElementById('fluxo-container').innerHTML = html;
@@ -116,14 +182,65 @@ function renderFluxo() {
   // Esconde botões admin para não-admin
   if (!isAdmin) {
     document.querySelectorAll('[onclick="openAdicionarEtapa()"]').forEach(b => b.style.display = 'none');
+  } else {
+    ativarDragDropEtapas();
   }
+}
+
+// ── DRAG & DROP de reordenação ────────────────────────────────
+let _dragEtapaId = null;
+
+function ativarDragDropEtapas() {
+  document.querySelectorAll('.fluxo-node[draggable="true"]').forEach(node => {
+    node.addEventListener('dragstart', e => {
+      _dragEtapaId = node.dataset.etapaId;
+      node.classList.add('dragging');
+      e.dataTransfer.effectAllowed = 'move';
+    });
+    node.addEventListener('dragend', () => {
+      node.classList.remove('dragging');
+      document.querySelectorAll('.fluxo-node.drag-over').forEach(n => n.classList.remove('drag-over'));
+    });
+    node.addEventListener('dragover', e => {
+      e.preventDefault();
+      // Só aceita drop dentro da MESMA fase
+      if (node.dataset.fase !== document.querySelector(`.fluxo-node[data-etapa-id="${_dragEtapaId}"]`)?.dataset.fase) return;
+      node.classList.add('drag-over');
+    });
+    node.addEventListener('dragleave', () => node.classList.remove('drag-over'));
+    node.addEventListener('drop', e => {
+      e.preventDefault();
+      node.classList.remove('drag-over');
+      const destinoId = node.dataset.etapaId;
+      if (!_dragEtapaId || _dragEtapaId === destinoId) return;
+      moverEtapaParaPosicaoDe(_dragEtapaId, destinoId);
+      _dragEtapaId = null;
+    });
+  });
+}
+
+/**
+ * Move a etapa `origemId` para a posição atualmente ocupada pela
+ * etapa `destinoId` (ambas precisam estar na mesma fase).
+ */
+function moverEtapaParaPosicaoDe(origemId, destinoId) {
+  let etapas = ls('etapasFluxo') || [];
+  const origem = etapas.find(e => e.id === origemId);
+  const destino = etapas.find(e => e.id === destinoId);
+  if (!origem || !destino || origem.fase !== destino.fase) return;
+
+  const novaOrdem = destino.ordem;
+  etapas = inserirEtapaComReordenacao(etapas, { ...origem, ordem: novaOrdem });
+  ls('etapasFluxo', etapas);
+  renderFluxo();
+  showToast('Ordem atualizada!');
 }
 
 // ── SALVAR ETAPA DO FLUXO ─────────────────────────────────────
 function salvarEtapaFluxo() {
   const nome = document.getElementById('etapa-nome-edit').value.trim();
   if (!nome) { alert('Informe o nome da etapa!'); return; }
-  const etapas = ls('etapasFluxo') || [];
+  let etapas = ls('etapasFluxo') || [];
   const id = document.getElementById('etapa-id-edit').value || genId();
 
   // Campos vêm do editor visual (_camposEtapaEdit, definido em modais.js)
@@ -135,31 +252,36 @@ function salvarEtapaFluxo() {
       return limpo;
     });
 
+  const posicaoDesejada = parseInt(document.getElementById('etapa-ordem-edit').value) || null;
+
   const obj = {
     id, nome,
     fase: document.getElementById('etapa-fase-edit').value,
     responsavel: document.getElementById('etapa-resp-edit').value,
     subfase: document.getElementById('etapa-subfase-edit').value,
-    ordem: parseInt(document.getElementById('etapa-ordem-edit').value) || 99,
+    ordem: posicaoDesejada, // posição DESEJADA — será resolvida abaixo
     acao: document.getElementById('etapa-acao-edit').value,
     campos,
   };
-  const idx = etapas.findIndex(e => e.id === id);
-  if (idx >= 0) etapas[idx] = obj; else etapas.push(obj);
+
+  // Insere/reposiciona com reordenação automática das demais etapas da fase
+  etapas = inserirEtapaComReordenacao(etapas, obj);
+
   ls('etapasFluxo', etapas);
   closeModal('modal-etapa-fluxo');
   renderFluxo();
-  showToast('Etapa salva!');
+  showToast('Etapa salva! Ordem das demais etapas ajustada automaticamente.');
 }
 
 function excluirEtapa() {
   const id = document.getElementById('etapa-id-edit').value;
-  if (!id || !confirm('Excluir esta etapa do fluxo?')) return;
+  if (!id || !confirm('Excluir esta etapa do fluxo?\n\nAs etapas seguintes desta fase serão renumeradas automaticamente.')) return;
   let etapas = ls('etapasFluxo') || [];
-  etapas = etapas.filter(e => e.id !== id);
+  etapas = removerEtapaComReordenacao(etapas, id);
   ls('etapasFluxo', etapas);
   closeModal('modal-etapa-fluxo');
   renderFluxo();
+  showToast('Etapa excluída e ordem ajustada!');
 }
 
 // ── DETALHE DO PROCESSO (acompanhamento) ──────────────────────
