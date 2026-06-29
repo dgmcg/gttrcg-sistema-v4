@@ -4,14 +4,90 @@
 
 // ── Helpers gerais ────────────────────────────────────────────
 function openModal(id) { document.getElementById(id)?.classList.add('open'); }
-function closeModal(id) { document.getElementById(id)?.classList.remove('open'); }
+
+/**
+ * closeModal(id) — fecha o modal, exceto quando se trata do
+ * modal-detalhe com alterações pendentes: nesse caso, pergunta
+ * antes de descartar (ver _confirmarFechamentoDetalhe).
+ */
+function closeModal(id) {
+  if (id === 'modal-detalhe' && _detalheTemAlteracoes()) {
+    _confirmarFechamentoDetalhe();
+    return;
+  }
+  document.getElementById(id)?.classList.remove('open');
+}
+
+/** Força o fechamento sem perguntar — usado após salvar com sucesso. */
+function closeModalForcado(id) {
+  document.getElementById(id)?.classList.remove('open');
+  if (id === 'modal-detalhe') _resetRastreioAlteracoes();
+}
+
+// ── Rastreio de alterações não salvas no modal de acompanhamento ──
+// Snapshot do HTML de detalhe-body no momento em que o modal é aberto.
+// Comparado com o estado atual dos campos para saber se algo mudou.
+let _detalheSnapshotInicial = null;
+
+function _iniciarRastreioAlteracoes() {
+  _detalheSnapshotInicial = _capturarEstadoCamposDetalhe();
+}
+
+function _resetRastreioAlteracoes() {
+  _detalheSnapshotInicial = null;
+}
+
+function _capturarEstadoCamposDetalhe() {
+  const estado = {};
+  document.querySelectorAll('#detalhe-body [data-etapa]').forEach(el => {
+    const key = el.id || `${el.dataset.etapa}_${el.dataset.campo}`;
+    estado[key] = el.type === 'checkbox' ? el.checked : el.value;
+  });
+  // Também rastreia status/fase do processo, editáveis no topo do modal
+  const statusEl = document.getElementById('detalhe-status');
+  const faseEl = document.getElementById('detalhe-fase');
+  if (statusEl) estado['_status'] = statusEl.value;
+  if (faseEl) estado['_fase'] = faseEl.value;
+  return estado;
+}
+
+function _detalheTemAlteracoes() {
+  if (!_detalheSnapshotInicial) return false;
+  const atual = _capturarEstadoCamposDetalhe();
+  const chaves = new Set([...Object.keys(_detalheSnapshotInicial), ...Object.keys(atual)]);
+  for (const k of chaves) {
+    if ((_detalheSnapshotInicial[k] ?? '') !== (atual[k] ?? '')) return true;
+  }
+  return false;
+}
+
+function _confirmarFechamentoDetalhe() {
+  const confirmou = confirm('Você tem alterações não salvas neste processo.\n\nDeseja realmente sair sem salvar o acompanhamento?');
+  if (confirmou) {
+    document.getElementById('modal-detalhe')?.classList.remove('open');
+    _resetRastreioAlteracoes();
+  }
+}
+
+// Aviso nativo do navegador ao tentar fechar a aba/recarregar com
+// alterações pendentes no modal de acompanhamento aberto.
+window.addEventListener('beforeunload', e => {
+  const modalAberto = document.getElementById('modal-detalhe')?.classList.contains('open');
+  if (modalAberto && _detalheTemAlteracoes()) {
+    e.preventDefault();
+    e.returnValue = '';
+  }
+});
 
 // ── Fechar modal ao clicar fora / ESC ─────────────────────────
 document.querySelectorAll('.modal-overlay').forEach(m => {
   m.addEventListener('click', e => { if (e.target === m) closeModal(m.id); });
 });
 document.addEventListener('keydown', e => {
-  if (e.key === 'Escape') document.querySelectorAll('.modal-overlay.open').forEach(m => closeModal(m.id));
+  if (e.key === 'Escape') {
+    const aberto = document.querySelector('.modal-overlay.open');
+    if (aberto) closeModal(aberto.id);
+  }
 });
 
 // ── MODAL PROCESSO: Novo/Editar ───────────────────────────────
