@@ -292,7 +292,13 @@ function openDetalhe(id) {
   APP.currentProcessoId = id;
   document.getElementById('detalhe-title').textContent = p.nome;
   document.getElementById('detalhe-subtitle').textContent = `${p.tipo || ''} · ${p.municipio || ''} · SEI: ${p.sei || 'N/A'}`;
-  document.getElementById('detalhe-edit-btn').onclick = () => { closeModal('modal-detalhe'); openEditarProcesso(id); };
+  document.getElementById('detalhe-edit-btn').onclick = () => {
+    if (_detalheTemAlteracoes()) {
+      if (!confirm('Você tem alterações não salvas no acompanhamento.\n\nDeseja descartá-las e editar os dados gerais do processo?')) return;
+    }
+    closeModalForcado('modal-detalhe');
+    openEditarProcesso(id);
+  };
 
   const etapas = ls('etapasFluxo') || [];
   const dur = getDuracaoProcesso(p, etapas);
@@ -374,34 +380,39 @@ function openDetalhe(id) {
         </div>
         <div class="etapa-body" id="etapa-body-${e.id}">
           <div style="font-size:11px;color:var(--text3);margin-bottom:10px;padding:6px 8px;background:var(--bg2);border-radius:var(--radius)">${e.acao || ''}</div>
-          <div class="etapa-fields">`;
+          ${!isInit ? `<div class="etapa-bloqueio-aviso" id="bloqueio-aviso-${e.id}" style="display:flex;align-items:center;gap:6px;font-size:12px;color:var(--yellow2);background:rgba(210,153,34,.1);border:1px solid rgba(210,153,34,.3);padding:7px 10px;border-radius:var(--radius);margin-bottom:10px">
+            <svg viewBox="0 0 16 16" fill="currentColor" width="13" height="13" style="flex-shrink:0"><path d="M8.982 1.566a1.13 1.13 0 0 0-1.96 0L.165 13.233c-.457.778.091 1.767.98 1.767h13.713c.889 0 1.438-.99.98-1.767L8.982 1.566zM8 5c.535 0 .954.462.9.995l-.35 3.507a.552.552 0 0 1-1.1 0L7.1 5.995A.905.905 0 0 1 8 5zm.002 6a1 1 0 1 1 0 2 1 1 0 0 1 0-2z"/></svg>
+            Marque <strong>"Iniciada"</strong> abaixo para liberar a edição dos campos desta etapa.
+          </div>` : ''}
+          <div class="etapa-fields" id="etapa-fields-${e.id}" ${!isInit ? 'style="opacity:.5;pointer-events:none"' : ''}>`;
 
       (e.campos || []).forEach(campo => {
         const fid = `ef_${e.id}_${campo.label.replace(/\s+/g, '_')}`;
         const val = acomp[campo.label] !== undefined ? acomp[campo.label] : '';
+        const dis = !isInit ? 'disabled' : '';
 
         if (campo.tipo === 'boolean') {
           html += `<div class="etapa-field"><label>${campo.label}</label>
-            <select id="${fid}" data-etapa="${e.id}" data-campo="${campo.label}">
+            <select id="${fid}" data-etapa="${e.id}" data-campo="${campo.label}" ${dis}>
               <option value="">-</option>
               <option value="true"${val === 'true' ? ' selected' : ''}>Sim</option>
               <option value="false"${val === 'false' ? ' selected' : ''}>Não</option>
             </select></div>`;
         } else if (campo.tipo === 'date') {
-          html += `<div class="etapa-field"><label>${campo.label}</label><input type="date" id="${fid}" data-etapa="${e.id}" data-campo="${campo.label}" value="${val}"></div>`;
+          html += `<div class="etapa-field"><label>${campo.label}</label><input type="date" id="${fid}" data-etapa="${e.id}" data-campo="${campo.label}" value="${val}" ${dis}></div>`;
         } else if (campo.tipo === 'listafixo' && campo.listaFonte) {
           const itens = getListaItens(campo.listaFonte);
           html += `<div class="etapa-field"><label>${campo.label}</label>
-            <select id="${fid}" data-etapa="${e.id}" data-campo="${campo.label}">
+            <select id="${fid}" data-etapa="${e.id}" data-campo="${campo.label}" ${dis}>
               <option value="">—</option>
               ${itens.map(it => `<option value="${it.value}"${val === it.value ? ' selected' : ''}>${it.label}</option>`).join('')}
             </select></div>`;
         } else if (campo.tipo === 'moeda') {
-          html += `<div class="etapa-field"><label>${campo.label}</label><input type="number" step="0.01" id="${fid}" data-etapa="${e.id}" data-campo="${campo.label}" value="${val}" placeholder="0,00"></div>`;
+          html += `<div class="etapa-field"><label>${campo.label}</label><input type="number" step="0.01" id="${fid}" data-etapa="${e.id}" data-campo="${campo.label}" value="${val}" placeholder="0,00" ${dis}></div>`;
         } else if (campo.tipo === 'pdf') {
           html += renderCampoDocumento(e.id, campo, val, id);
         } else {
-          html += `<div class="etapa-field"><label>${campo.label}</label><input type="text" id="${fid}" data-etapa="${e.id}" data-campo="${campo.label}" value="${val}" placeholder="${campo.label}"></div>`;
+          html += `<div class="etapa-field"><label>${campo.label}</label><input type="text" id="${fid}" data-etapa="${e.id}" data-campo="${campo.label}" value="${val}" placeholder="${campo.label}" ${dis}></div>`;
         }
       });
 
@@ -447,6 +458,9 @@ function openDetalhe(id) {
   });
 
   openModal('modal-detalhe');
+  // Inicia o rastreio de alterações DEPOIS de tudo renderizado e preenchido,
+  // para que o snapshot reflita o estado real salvo (não vazio).
+  setTimeout(_iniciarRastreioAlteracoes, 50);
 }
 
 // ── Linha do tempo ────────────────────────────────────────────
@@ -681,18 +695,31 @@ function marcarEtapaIniciada(procId, etapaId, checked) {
   atualizarFaseProcesso(procId);
   const pdEl = document.getElementById('detalhe-progresso-display');
   if (pdEl) pdEl.textContent = processos[idx].progresso + '%';
-  // Atualiza estilo da etapa
+
+  // Atualiza estilo da etapa (se o item ainda estiver no DOM)
   const item = document.getElementById('etapa-item-' + etapaId);
-  if (!item) return;
-  const num = item.querySelector('.etapa-num');
-  const isDone = processos[idx].acompanhamento[etapaId]._concluido;
-  if (!isDone && checked) {
-    item.className = item.className.replace(/done|active-step|pending/g, '') + ' active-step';
-    if (num) { num.className = 'etapa-num active'; }
-  } else if (!checked && !isDone) {
-    item.className = item.className.replace(/done|active-step|pending/g, '') + ' pending';
-    if (num) num.className = 'etapa-num pending';
+  if (item) {
+    const num = item.querySelector('.etapa-num');
+    const isDone = processos[idx].acompanhamento[etapaId]._concluido;
+    if (!isDone && checked) {
+      item.className = item.className.replace(/done|active-step|pending/g, '') + ' active-step';
+      if (num) { num.className = 'etapa-num active'; }
+    } else if (!checked && !isDone) {
+      item.className = item.className.replace(/done|active-step|pending/g, '') + ' pending';
+      if (num) num.className = 'etapa-num pending';
+    }
   }
+
+  // Destrava/trava os campos da etapa imediatamente, sem re-renderizar o modal inteiro
+  const camposWrap = document.getElementById('etapa-fields-' + etapaId);
+  if (camposWrap) {
+    camposWrap.style.opacity = checked ? '1' : '.5';
+    camposWrap.style.pointerEvents = checked ? '' : 'none';
+    camposWrap.querySelectorAll('input, select').forEach(el => { el.disabled = !checked; });
+  }
+  const avisoEl = document.getElementById('bloqueio-aviso-' + etapaId);
+  if (avisoEl) avisoEl.style.display = checked ? 'none' : 'flex';
+
   UndoStack?.updateBtn?.();
 }
 
@@ -752,7 +779,7 @@ function salvarAcompanhamento() {
   const etapas = ls('etapasFluxo') || [];
   processos[idx].progresso = calcProgressoProcesso(processos[idx], etapas);
   ls('processos', processos);
-  closeModal('modal-detalhe');
+  closeModalForcado('modal-detalhe');
 
   renderMonitoramento();
   if (typeof monitorView !== 'undefined' && monitorView === 'kanban') renderKanban();
