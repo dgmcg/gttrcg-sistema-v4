@@ -208,22 +208,47 @@ function salvarProcesso() {
 }
 
 // ── MODAL ETAPA FLUXO ─────────────────────────────────────────
+
+// Coleções de dados fixos disponíveis como "lista fonte" para campos tipo listafixo
+const LISTAS_FIXAS_DISPONIVEIS = [
+  { key: 'setores',        label: 'Setores / Órgãos' },
+  { key: 'pessoas',        label: 'Pessoas' },
+  { key: 'unidades',       label: 'Unidades de Saúde' },
+  { key: 'oss',            label: 'Organizações Sociais (OSS)' },
+  { key: 'statusProcesso', label: 'Status de Processo' },
+  { key: 'fases',          label: 'Fases do Processo' },
+  { key: 'tiposProcesso',  label: 'Tipos de Processo' },
+  { key: 'statusContrato', label: 'Status do Contrato' },
+  { key: 'tiposUnidade',   label: 'Tipos de Unidade' },
+];
+
+const TIPOS_CAMPO_ETAPA = [
+  { value: 'text',      label: 'Texto' },
+  { value: 'boolean',   label: 'Sim / Não' },
+  { value: 'date',      label: 'Data' },
+  { value: 'moeda',     label: 'Valor (R$)' },
+  { value: 'listafixo', label: 'Lista Fixa (dados fixos)' },
+  { value: 'pdf',       label: 'Documento PDF' },
+];
+
+// Estado em memória dos campos sendo editados no modal (array de {tipo,label,listaFonte})
+let _camposEtapaEdit = [];
+
 function openAdicionarEtapa() {
   APP.editingEtapaId = null;
   document.getElementById('modal-etapa-fluxo-title').textContent = 'Nova Etapa';
   document.getElementById('etapa-id-edit').value = '';
-  ['etapa-nome-edit', 'etapa-resp-edit', 'etapa-acao-edit', 'etapa-campos-edit'].forEach(id => {
+  ['etapa-nome-edit', 'etapa-resp-edit', 'etapa-acao-edit'].forEach(id => {
     const el = document.getElementById(id); if (el) el.value = '';
   });
   document.getElementById('etapa-ordem-edit').value = '';
   document.getElementById('etapa-fase-edit').value = 'planejamento';
-  // subfase como select de fases
   _populateSubfaseSelect('');
+  _camposEtapaEdit = [];
+  renderListaCamposEtapa();
   document.getElementById('btn-excluir-etapa').style.display = 'none';
   openModal('modal-etapa-fluxo');
 }
-
-function openEditarFluxo() { openAdicionarEtapa(); }
 
 function editarEtapaFluxo(id) {
   const etapas = ls('etapasFluxo') || [];
@@ -237,10 +262,96 @@ function editarEtapaFluxo(id) {
   document.getElementById('etapa-resp-edit').value = e.responsavel || '';
   document.getElementById('etapa-ordem-edit').value = e.ordem || '';
   document.getElementById('etapa-acao-edit').value = e.acao || '';
-  document.getElementById('etapa-campos-edit').value = (e.campos || []).map(c => `${c.tipo}|${c.label}`).join('\n');
   _populateSubfaseSelect(e.subfase || '');
+  // Clona os campos da etapa para o estado de edição
+  _camposEtapaEdit = (e.campos || []).map(c => ({ ...c }));
+  renderListaCamposEtapa();
   document.getElementById('btn-excluir-etapa').style.display = 'inline-flex';
   openModal('modal-etapa-fluxo');
+}
+
+// ── Editor visual de campos ────────────────────────────────────
+
+function renderListaCamposEtapa() {
+  const container = document.getElementById('etapa-campos-lista');
+  if (!container) return;
+
+  if (_camposEtapaEdit.length === 0) {
+    container.innerHTML = '<div style="font-size:12px;color:var(--text3);padding:10px;text-align:center;background:var(--bg2);border-radius:var(--radius);border:1px dashed var(--border2)">Nenhum campo adicionado ainda. Clique em "Adicionar Campo" abaixo.</div>';
+    return;
+  }
+
+  container.innerHTML = _camposEtapaEdit.map((campo, i) => {
+    const isLista = campo.tipo === 'listafixo';
+    const listaOpts = LISTAS_FIXAS_DISPONIVEIS.map(l =>
+      `<option value="${l.key}" ${campo.listaFonte === l.key ? 'selected' : ''}>${l.label}</option>`
+    ).join('');
+    const tipoOpts = TIPOS_CAMPO_ETAPA.map(t =>
+      `<option value="${t.value}" ${campo.tipo === t.value ? 'selected' : ''}>${t.label}</option>`
+    ).join('');
+
+    return `
+      <div class="schema-field-row" style="flex-wrap:wrap">
+        <div class="schema-drag-handle" title="Posição ${i + 1}">⠿</div>
+        <input type="text" value="${(campo.label || '').replace(/"/g, '&quot;')}"
+               placeholder="Rótulo do campo (ex: Solicitado?)"
+               oninput="atualizarCampoEtapa(${i}, 'label', this.value)"
+               style="flex:1;min-width:160px">
+        <select onchange="atualizarCampoEtapa(${i}, 'tipo', this.value)" style="width:170px">
+          ${tipoOpts}
+        </select>
+        ${isLista ? `
+          <select onchange="atualizarCampoEtapa(${i}, 'listaFonte', this.value)" style="width:190px">
+            <option value="">— Selecionar lista —</option>
+            ${listaOpts}
+          </select>` : ''}
+        <div style="display:flex;gap:2px">
+          <button type="button" class="btn sm icon" title="Mover para cima" onclick="moverCampoEtapa(${i}, -1)" ${i === 0 ? 'disabled style="opacity:.3"' : ''}>
+            <svg viewBox="0 0 16 16" fill="currentColor" width="12" height="12"><path d="M7.646 4.646a.5.5 0 0 1 .708 0l6 6a.5.5 0 0 1-.708.708L8 5.707l-5.646 5.647a.5.5 0 0 1-.708-.708l6-6z"/></svg>
+          </button>
+          <button type="button" class="btn sm icon" title="Mover para baixo" onclick="moverCampoEtapa(${i}, 1)" ${i === _camposEtapaEdit.length - 1 ? 'disabled style="opacity:.3"' : ''}>
+            <svg viewBox="0 0 16 16" fill="currentColor" width="12" height="12"><path d="M1.646 4.646a.5.5 0 0 1 .708 0L8 10.293l5.646-5.647a.5.5 0 0 1 .708.708l-6 6a.5.5 0 0 1-.708 0l-6-6a.5.5 0 0 1 0-.708z"/></svg>
+          </button>
+          <button type="button" class="btn sm icon danger" title="Remover campo" onclick="removerCampoEtapa(${i})">
+            <svg viewBox="0 0 16 16" fill="currentColor" width="12" height="12"><path d="M5.5 5.5A.5.5 0 0 1 6 6v6a.5.5 0 0 1-1 0V6a.5.5 0 0 1 .5-.5zm2.5 0a.5.5 0 0 1 .5.5v6a.5.5 0 0 1-1 0V6a.5.5 0 0 1 .5-.5zm3 .5a.5.5 0 0 0-1 0v6a.5.5 0 0 0 1 0V6z"/></svg>
+          </button>
+        </div>
+      </div>`;
+  }).join('');
+}
+
+function adicionarLinhaCampoEtapa() {
+  _camposEtapaEdit.push({ tipo: 'text', label: '' });
+  renderListaCamposEtapa();
+  // Foca no novo input de rótulo
+  setTimeout(() => {
+    const inputs = document.querySelectorAll('#etapa-campos-lista input[type="text"]');
+    inputs[inputs.length - 1]?.focus();
+  }, 30);
+}
+
+function atualizarCampoEtapa(idx, prop, val) {
+  if (!_camposEtapaEdit[idx]) return;
+  _camposEtapaEdit[idx][prop] = val;
+  // Ao trocar o tipo, re-renderiza para mostrar/esconder o seletor de lista fonte
+  if (prop === 'tipo') {
+    if (val !== 'listafixo') delete _camposEtapaEdit[idx].listaFonte;
+    renderListaCamposEtapa();
+  }
+}
+
+function moverCampoEtapa(idx, direcao) {
+  const novoIdx = idx + direcao;
+  if (novoIdx < 0 || novoIdx >= _camposEtapaEdit.length) return;
+  const tmp = _camposEtapaEdit[idx];
+  _camposEtapaEdit[idx] = _camposEtapaEdit[novoIdx];
+  _camposEtapaEdit[novoIdx] = tmp;
+  renderListaCamposEtapa();
+}
+
+function removerCampoEtapa(idx) {
+  _camposEtapaEdit.splice(idx, 1);
+  renderListaCamposEtapa();
 }
 
 function _populateSubfaseSelect(currentVal) {
