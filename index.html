@@ -472,7 +472,7 @@
       <div class="form-grid">
         <div class="field-group full"><label>Nome da Etapa *</label><input type="text" id="etapa-nome-edit" placeholder="Ex: Acionamento da SCONT"></div>
         <div class="field-group"><label>Fase Principal *</label>
-          <select id="etapa-fase-edit">
+          <select id="etapa-fase-edit" onchange="onTrocarFaseEtapaEdit(this.value)">
             <option value="planejamento">Fase de Planejamento, Instrução e Correção</option>
             <option value="externa">Fase Externa - Publicação</option>
             <option value="contratacao">Fase de Contratação</option>
@@ -480,7 +480,11 @@
         </div>
         <div class="field-group"><label>Responsável</label><input type="text" id="etapa-resp-edit" placeholder="Ex: GTTRCG"></div>
         <div class="field-group"><label>Fase</label><input type="text" id="etapa-subfase-edit" placeholder="Ex: Confecção de NT/ETP"></div>
-        <div class="field-group"><label>Posição na Fase (ordem)</label><input type="number" id="etapa-ordem-edit" placeholder="Ex: 1, 2, 3..." min="1"></div>
+        <div class="field-group">
+          <label>Posição na Fase (ordem)</label>
+          <input type="number" id="etapa-ordem-edit" placeholder="Ex: 1, 2, 3..." min="1">
+          <div class="field-hint">As demais etapas desta fase são reordenadas automaticamente.</div>
+        </div>
         <div class="field-group full"><label>Ação (protocolo)</label><textarea id="etapa-acao-edit" rows="2" placeholder="Descrição da ação desta etapa"></textarea></div>
         <div style="font-size:11px;color:var(--text3);text-transform:uppercase;letter-spacing:.6px;padding:12px 0 6px;border-bottom:1px solid var(--border);margin-bottom:14px;grid-column:1/-1;font-weight:600">Campos de Acompanhamento</div>
         <div class="field-group full">
