@@ -239,11 +239,7 @@
       <div class="page-header">
         <div class="page-title">Fluxo do Processo <small>Desenho e Protocolos</small></div>
         <div class="page-actions">
-          <button class="btn" onclick="openEditarFluxo()">
-            <svg viewBox="0 0 16 16" fill="currentColor"><path d="M12.146.146a.5.5 0 0 1 .708 0l3 3a.5.5 0 0 1 0 .708l-10 10a.5.5 0 0 1-.168.11l-5 2a.5.5 0 0 1-.65-.65l2-5a.5.5 0 0 1 .11-.168l10-10z"/></svg>
-            Editar Fluxo
-          </button>
-          <button class="btn" onclick="openAdicionarEtapa()">
+          <button class="btn primary" onclick="openAdicionarEtapa()">
             <svg viewBox="0 0 16 16" fill="currentColor"><path d="M8 2a.5.5 0 0 1 .5.5v5h5a.5.5 0 0 1 0 1h-5v5a.5.5 0 0 1-1 0v-5h-5a.5.5 0 0 1 0-1h5v-5A.5.5 0 0 1 8 2z"/></svg>
             Adicionar Etapa
           </button>
@@ -251,7 +247,7 @@
       </div>
       <div class="alert info" style="margin-bottom:20px">
         <svg viewBox="0 0 16 16" fill="currentColor" width="14" height="14" style="flex-shrink:0;margin-top:1px"><path d="M8 16A8 8 0 1 0 8 0a8 8 0 0 0 0 16zm.93-9.412-1 4.705c-.07.34.029.533.304.533.194 0 .487-.07.686-.246l-.088.416c-.287.346-.92.598-1.465.598-.703 0-1.002-.422-.808-1.319l.738-3.468c.064-.293.006-.399-.287-.47l-.451-.081.082-.381 2.29-.287zM8 5.5a1 1 0 1 1 0-2 1 1 0 0 1 0 2z"/></svg>
-        Mapa do fluxo GTTRCG — 39 etapas em 3 fases. Clique em qualquer etapa para editar.
+        Mapa do fluxo GTTRCG — 39 etapas em 3 fases. Clique em qualquer etapa para editar seus dados, protocolo e campos de acompanhamento.
       </div>
       <div id="fluxo-container"></div>
     </div>
@@ -488,9 +484,11 @@
         <div class="field-group full"><label>Ação (protocolo)</label><textarea id="etapa-acao-edit" rows="2" placeholder="Descrição da ação desta etapa"></textarea></div>
         <div style="font-size:11px;color:var(--text3);text-transform:uppercase;letter-spacing:.6px;padding:12px 0 6px;border-bottom:1px solid var(--border);margin-bottom:14px;grid-column:1/-1;font-weight:600">Campos de Acompanhamento</div>
         <div class="field-group full">
-          <label>Campos desta Etapa (um por linha: tipo|label)</label>
-          <textarea id="etapa-campos-edit" rows="5" placeholder="Exemplos:&#10;boolean|Solicitado?&#10;date|Data&#10;text|Id SEI&#10;listafixo|OSS (lista oss)&#10;pdf|Documento"></textarea>
-          <div class="field-hint">Tipos: boolean, date, text, select, pdf, listafixo, autofield, moeda</div>
+          <div id="etapa-campos-lista" style="display:flex;flex-direction:column;gap:6px;margin-bottom:10px"></div>
+          <button type="button" class="btn sm" onclick="adicionarLinhaCampoEtapa()" style="align-self:flex-start">
+            <svg viewBox="0 0 16 16" fill="currentColor" width="13" height="13"><path d="M8 2a.5.5 0 0 1 .5.5v5h5a.5.5 0 0 1 0 1h-5v5a.5.5 0 0 1-1 0v-5h-5a.5.5 0 0 1 0-1h5v-5A.5.5 0 0 1 8 2z"/></svg>
+            Adicionar Campo
+          </button>
         </div>
       </div>
     </div>
