@@ -253,89 +253,15 @@ function setMonitorView(view) {
   updateSidebarCounts();
 }
 
-function renderKanban() {
-  const processos = filtrarProcessos();
-  const etapas    = ls('etapasFluxo') || [];
-  const fases     = ls('fases')       || [];
-  const wrap      = document.getElementById('kanban-view');
-  if (!wrap) return;
-
-  // Agrupa por fase → etapa atual
-  const faseGroups = {};
-  fases.forEach(f => { faseGroups[f] = {}; });
-
-  processos.forEach(p => {
-    const f = p.fase || 'Sem Fase';
-    if (!faseGroups[f]) faseGroups[f] = {};
-    const etapaAtual = inferEtapaAtual(p, etapas);
-    const etNome = etapaAtual ? etapaAtual.nome : 'Sem Etapa Definida';
-    if (!faseGroups[f][etNome]) faseGroups[f][etNome] = [];
-    faseGroups[f][etNome].push(p);
-  });
-
-  // Remove fases vazias
-  Object.keys(faseGroups).forEach(f => {
-    if (!Object.keys(faseGroups[f]).length) delete faseGroups[f];
-  });
-
-  if (!Object.keys(faseGroups).length) {
-    wrap.innerHTML = '<div class="empty-state" style="padding:48px 20px"><p>Nenhum processo encontrado com os filtros aplicados</p></div>';
-    return;
-  }
-
-  const faseColors = ['var(--accent2)','var(--green)','var(--yellow2)','var(--purple)','var(--red2)','var(--teal)'];
-  let html = '<div class="kanban-wrap"><div class="kanban-board">';
-  let fi = 0;
-
-  Object.entries(faseGroups).forEach(([fase, etapasObj]) => {
-    const totalProc = Object.values(etapasObj).reduce((a, b) => a + b.length, 0);
-    const color = faseColors[fi % faseColors.length];
-
-    html += `<div class="kanban-col">
-      <div class="kanban-col-header" style="border-top:3px solid ${color}" onclick="toggleKanbanCol(this)">
-        <div class="kanban-col-title">${fase}</div>
-        <span class="kanban-col-count">${totalProc}</span>
-      </div>
-      <div class="kanban-col-body">`;
-
-    Object.entries(etapasObj).forEach(([etNome, procs]) => {
-      html += `<div class="kanban-etapa">
-        <div class="kanban-etapa-header" onclick="toggleKanbanEtapa(this)">
-          <svg viewBox="0 0 16 16" fill="currentColor" width="10" height="10" style="color:${color};flex-shrink:0"><circle cx="8" cy="8" r="5"/></svg>
-          <span class="kanban-etapa-title">${etNome}</span>
-          <span class="kanban-etapa-count">${procs.length}</span>
-        </div>
-        <div class="kanban-etapa-body open">`;
-
-      procs.forEach(p => {
-        const etapasAll = ls('etapasFluxo') || [];
-        const dur = getDuracaoProcesso(p, etapasAll);
-        const durHtml = dur ? `<span style="font-size:10px;color:var(--text3);margin-left:4px">${dur.concluido?'✓':'⏱'} ${fmtDuracao(dur.dias)}</span>` : '';
-        const isMeuFav = euFavoritei(p);
-
-        html += `<div class="kanban-card" onclick="openDetalhe('${p.id}')">
-          <div class="kanban-card-name">${p.nome}${isMeuFav?' ⭐':''}${durHtml}</div>
-          <div class="kanban-card-meta">
-            <span class="badge ${tipoBadge(p.tipo)}" style="font-size:10px">${p.tipo||'-'}</span>
-            <span class="badge ${statusBadge(p.status)}" style="font-size:10px;max-width:130px;overflow:hidden;text-overflow:ellipsis">
-              ${(p.status||'-').length>20?(p.status||'-').slice(0,18)+'…':(p.status||'-')}
-            </span>
-          </div>
-        </div>`;
-      });
-
-      html += `</div></div>`;
-    });
-
-    html += `</div></div>`;
-    fi++;
-  });
-
-  html += '</div></div>';
-  wrap.innerHTML = html;
+// renderKanban → implementada no bloco Kanban v2 abaixo
+// toggleKanbanCol e toggleKanbanEtapa mantidas por compatibilidade
+function toggleKanbanCol(header) {
+  const body = header.nextElementSibling;
+  if (body) body.style.display = body.style.display === 'none' ? '' : 'none';
 }
-
-// ── Inferir etapa atual de um processo ────────────────────────
+function toggleKanbanEtapa(header) {
+  if (header.nextElementSibling) header.nextElementSibling.classList.toggle('open');
+}
 function inferEtapaAtual(p, etapas) {
   if (!p.acompanhamento) return null;
   const sorted = etapasOrdenadas(etapas);
@@ -345,16 +271,6 @@ function inferEtapaAtual(p, etapas) {
   });
   if (iniciada) return iniciada;
   return sorted.find(e => !(p.acompanhamento[e.id]||{})._concluido) || null;
-}
-
-// ── Toggle de colunas/etapas no Kanban ────────────────────────
-function toggleKanbanCol(header) {
-  const body = header.nextElementSibling;
-  body.style.display = body.style.display === 'none' ? '' : 'none';
-}
-
-function toggleKanbanEtapa(header) {
-  header.nextElementSibling.classList.toggle('open');
 }
 
 // ============================================================
@@ -410,3 +326,310 @@ document.addEventListener('change', e => {
 })();
 
 console.log('[GTTRCG] monitoramento.js carregado ✓');
+
+// ============================================================
+// KANBAN v2 — 4 colunas fixas com sub-blocos personalizáveis
+// ============================================================
+
+const KANBAN_COLUNAS = [
+  { id: 'afazer',      label: 'A Fazer',      cor: '#6B778C' },
+  { id: 'progresso',   label: 'Em Progresso', cor: '#0052CC' },
+  { id: 'concluido',   label: 'Concluído',    cor: '#36B37E' },
+  { id: 'cancelado',   label: 'Cancelado',    cor: '#FF5630' },
+];
+
+// Coluna expandida no momento (id da coluna ou null)
+let _kanbanExpanded = null;
+// Drag state
+let _kDragProcId = null;
+let _kDragOrigemColuna = null;
+let _kDragOrigemGrupo = null;
+
+// ── Carregar/salvar configuração de grupos do Kanban ──────────
+
+function kanbanGetGrupos() {
+  try {
+    // Tenta ler do _DB (carregado do Sheets via getAllData → kanbanGrupos)
+    const raw = ls('kanbanGrupos');
+    if (!raw) return _kanbanGruposPadrao();
+    const parsed = typeof raw === 'string' ? JSON.parse(raw) : raw;
+    // Garante que todas as colunas existem
+    const grupos = parsed || {};
+    KANBAN_COLUNAS.forEach(c => { if (!grupos[c.id]) grupos[c.id] = ['Geral']; });
+    return grupos;
+  } catch { return _kanbanGruposPadrao(); }
+}
+
+function _kanbanGruposPadrao() {
+  const cfg = {};
+  KANBAN_COLUNAS.forEach(c => { cfg[c.id] = ['Geral']; });
+  return cfg;
+}
+
+function kanbanSalvarGrupos(cfg) {
+  // Salva como string JSON — o Apps Script grava via gravarConfig('kanbanGrupos', ...)
+  ls('kanbanGrupos', JSON.stringify(cfg));
+}
+
+// ── Ler/gravar coluna e grupo do processo ─────────────────────
+
+function kanbanGetColuna(p) {
+  return p.kanbanColuna || 'afazer';
+}
+
+function kanbanGetGrupo(p, colunaId) {
+  return p.kanbanGrupo || 'Geral';
+}
+
+function kanbanMoverProcesso(procId, novaColuna, novoGrupo) {
+  const processos = ls('processos') || [];
+  const idx = processos.findIndex(p => p.id === procId);
+  if (idx < 0) return;
+  processos[idx].kanbanColuna = novaColuna;
+  processos[idx].kanbanGrupo  = novoGrupo || 'Geral';
+  ls('processos', processos);
+  renderKanban();
+}
+
+// ── RENDERIZAÇÃO PRINCIPAL ────────────────────────────────────
+
+function renderKanban() {
+  const wrap = document.getElementById('kanban-view');
+  if (!wrap) return;
+
+  const processos = filtrarProcessos();
+  const grupos    = kanbanGetGrupos();
+  const isAdmin   = APP.currentUser?.perfil === 'admin';
+
+  // Se há uma coluna expandida, ela ocupa metade; as outras ficam compactas
+  const expanded = _kanbanExpanded;
+
+  let html = `<div class="kanban-v2-board" style="display:flex;gap:12px;align-items:flex-start;min-height:500px">`;
+
+  KANBAN_COLUNAS.forEach(col => {
+    const isExp = expanded === col.id;
+    const isHidden = expanded && !isExp;
+    const colProcessos = processos.filter(p => kanbanGetColuna(p) === col.id);
+    const colGrupos = grupos[col.id] || ['Geral'];
+
+    const width = isExp ? '48%' : expanded ? '17%' : '24%';
+
+    html += `
+    <div class="kanban-v2-col" id="kv2col-${col.id}"
+         data-coluna="${col.id}"
+         style="width:${width};min-width:${isHidden?'120px':'200px'};
+                flex-shrink:0;transition:width .3s;
+                background:var(--bg2);border-radius:var(--radius2);
+                border:1px solid var(--border);overflow:hidden">
+
+      <!-- Cabeçalho da coluna -->
+      <div style="background:${col.cor}18;border-bottom:3px solid ${col.cor};
+                  padding:10px 12px;display:flex;align-items:center;gap:8px">
+        <div style="width:8px;height:8px;border-radius:50%;background:${col.cor};flex-shrink:0"></div>
+        <span style="font-weight:700;font-size:13px;color:var(--text);flex:1">${col.label}</span>
+        <span style="font-size:11px;background:${col.cor}33;color:${col.cor};
+                     padding:2px 7px;border-radius:10px;font-weight:600">${colProcessos.length}</span>
+        <button onclick="kanbanToggleExpand('${col.id}')" title="${isExp?'Recolher':'Expandir'}"
+                style="background:none;border:none;cursor:pointer;color:${col.cor};padding:2px;line-height:1">
+          ${isExp
+            ? `<svg viewBox="0 0 16 16" fill="currentColor" width="14" height="14"><path d="M5.5 0a.5.5 0 0 1 .5.5v4A1.5 1.5 0 0 1 4.5 6h-4a.5.5 0 0 1 0-1h4a.5.5 0 0 0 .5-.5v-4a.5.5 0 0 1 .5-.5zm5 0a.5.5 0 0 1 .5.5v4a.5.5 0 0 0 .5.5h4a.5.5 0 0 1 0 1h-4A1.5 1.5 0 0 1 10 4.5v-4a.5.5 0 0 1 .5-.5zM0 10.5a.5.5 0 0 1 .5-.5h4A1.5 1.5 0 0 1 6 11.5v4a.5.5 0 0 1-1 0v-4a.5.5 0 0 0-.5-.5h-4a.5.5 0 0 1-.5-.5zm10 1a1.5 1.5 0 0 1 1.5-1.5h4a.5.5 0 0 1 0 1h-4a.5.5 0 0 0-.5.5v4a.5.5 0 0 1-1 0v-4z"/></svg>`
+            : `<svg viewBox="0 0 16 16" fill="currentColor" width="14" height="14"><path d="M1.5 1h4a.5.5 0 0 1 0 1h-4a.5.5 0 0 0-.5.5v4a.5.5 0 0 1-1 0v-4A1.5 1.5 0 0 1 1.5 1zm9 0a.5.5 0 0 1 0-1h4A1.5 1.5 0 0 1 16 1.5v4a.5.5 0 0 1-1 0v-4a.5.5 0 0 0-.5-.5h-4zm-9 14a.5.5 0 0 1-.5-.5v-4a.5.5 0 0 1 1 0v4a.5.5 0 0 0 .5.5h4a.5.5 0 0 1 0 1h-4A1.5 1.5 0 0 1 1.5 15zm9.5-.5v-4a.5.5 0 0 1 1 0v4a.5.5 0 0 0 .5.5h4a.5.5 0 0 1 0 1h-4a1.5 1.5 0 0 1-1.5-1.5z"/></svg>`}
+        </button>
+      </div>
+
+      <!-- Corpo da coluna -->
+      <div style="padding:${isHidden?'8px 4px':'10px'};display:flex;flex-direction:column;gap:8px;
+                  max-height:calc(100vh - 200px);overflow-y:auto">`;
+
+    if (isHidden) {
+      // Coluna compacta: só conta
+      html += `<div style="writing-mode:vertical-rl;text-align:center;color:var(--text3);
+                            font-size:11px;padding:8px 0;cursor:pointer"
+                    onclick="kanbanToggleExpand('${col.id}')">
+                 ${colProcessos.length} processo${colProcessos.length!==1?'s':''}
+               </div>`;
+    } else {
+      // Sub-blocos
+      colGrupos.forEach(grupoNome => {
+        const grupoProcs = colProcessos.filter(p => kanbanGetGrupo(p, col.id) === grupoNome);
+
+        html += `
+        <div class="kv2-grupo" data-coluna="${col.id}" data-grupo="${grupoNome}"
+             style="background:var(--bg);border:1px solid var(--border);
+                    border-radius:var(--radius);overflow:hidden">
+          <!-- Cabeçalho do sub-bloco -->
+          <div style="padding:6px 10px;display:flex;align-items:center;gap:6px;
+                      background:var(--bg2);border-bottom:1px solid var(--border)">
+            <span style="font-size:11px;font-weight:600;color:var(--text2);flex:1">${grupoNome}</span>
+            <span style="font-size:10px;color:var(--text3)">${grupoProcs.length}</span>
+            ${isAdmin ? `
+              <button onclick="kanbanRenomearGrupo('${col.id}','${grupoNome.replace(/'/g,"\\'")}')"
+                      title="Renomear" style="background:none;border:none;cursor:pointer;
+                             color:var(--text3);padding:1px;line-height:1">✏️</button>
+              <button onclick="kanbanExcluirGrupo('${col.id}','${grupoNome.replace(/'/g,"\\'")}')"
+                      title="Excluir grupo" style="background:none;border:none;cursor:pointer;
+                             color:var(--text3);padding:1px;line-height:1">🗑</button>` : ''}
+          </div>
+          <!-- Zona de drop do sub-bloco -->
+          <div class="kv2-dropzone" data-coluna="${col.id}" data-grupo="${grupoNome}"
+               style="padding:6px;min-height:48px;display:flex;flex-direction:column;gap:6px">`;
+
+        grupoProcs.forEach(p => {
+          const isMeuFav = euFavoritei(p);
+          html += `
+            <div class="kv2-card" draggable="true"
+                 data-proc-id="${p.id}"
+                 data-coluna="${col.id}"
+                 data-grupo="${grupoNome}"
+                 onclick="openDetalhe('${p.id}')"
+                 style="background:var(--bg2);border:1px solid var(--border);
+                        border-radius:var(--radius);padding:8px 10px;cursor:grab;
+                        border-left:3px solid ${col.cor}">
+              <div style="font-size:12px;font-weight:500;color:var(--text);margin-bottom:4px">
+                ${p.nome}${isMeuFav?' ⭐':''}
+              </div>
+              <div style="display:flex;gap:4px;flex-wrap:wrap">
+                <span class="badge ${tipoBadge(p.tipo)}" style="font-size:10px">${p.tipo||'-'}</span>
+                <span style="font-size:10px;color:var(--text3)">${p.oss||''}</span>
+              </div>
+              ${p.kanbanGrupo && p.kanbanGrupo !== 'Geral'
+                ? `<div style="font-size:10px;color:${col.cor};margin-top:3px">📌 ${p.kanbanGrupo}</div>`
+                : ''}
+            </div>`;
+        });
+
+        html += `</div></div>`; // fecha dropzone e grupo
+      });
+
+      // Botão adicionar grupo (só admin, só na coluna expandida ou sempre)
+      if (isAdmin) {
+        html += `
+        <button onclick="kanbanAdicionarGrupo('${col.id}')"
+                style="background:none;border:1px dashed var(--border2);border-radius:var(--radius);
+                       padding:8px;font-size:11px;color:var(--text3);cursor:pointer;
+                       width:100%;text-align:center;transition:all .2s"
+                onmouseover="this.style.borderColor='${col.cor}';this.style.color='${col.cor}'"
+                onmouseout="this.style.borderColor='var(--border2)';this.style.color='var(--text3)'">
+          + Adicionar grupo
+        </button>`;
+      }
+
+      // Zona de drop da coluna (para processos sem grupo ou ao soltar fora de um grupo)
+      html += `<div class="kv2-col-dropzone" data-coluna="${col.id}" data-grupo="Geral"
+                    style="min-height:20px"></div>`;
+    }
+
+    html += `</div></div>`; // fecha body e coluna
+  });
+
+  html += `</div>`;
+  wrap.innerHTML = html;
+
+  // Ativa drag & drop
+  _ativarKanbanDragDrop();
+}
+
+// ── Expandir/recolher coluna ──────────────────────────────────
+
+function kanbanToggleExpand(colunaId) {
+  _kanbanExpanded = _kanbanExpanded === colunaId ? null : colunaId;
+  renderKanban();
+}
+
+// ── Drag & Drop ───────────────────────────────────────────────
+
+function _ativarKanbanDragDrop() {
+  // Cards arrastáveis
+  document.querySelectorAll('.kv2-card').forEach(card => {
+    card.addEventListener('dragstart', e => {
+      _kDragProcId       = card.dataset.procId;
+      _kDragOrigemColuna = card.dataset.coluna;
+      _kDragOrigemGrupo  = card.dataset.grupo;
+      card.style.opacity = '.4';
+      e.dataTransfer.effectAllowed = 'move';
+    });
+    card.addEventListener('dragend', () => {
+      card.style.opacity = '';
+      document.querySelectorAll('.kv2-dropzone.drag-over, .kv2-col-dropzone.drag-over')
+        .forEach(z => z.classList.remove('drag-over'));
+    });
+  });
+
+  // Zonas de soltura (sub-blocos e coluna)
+  document.querySelectorAll('.kv2-dropzone, .kv2-col-dropzone').forEach(zone => {
+    zone.addEventListener('dragover', e => {
+      e.preventDefault();
+      zone.classList.add('drag-over');
+    });
+    zone.addEventListener('dragleave', () => zone.classList.remove('drag-over'));
+    zone.addEventListener('drop', e => {
+      e.preventDefault();
+      zone.classList.remove('drag-over');
+      if (!_kDragProcId) return;
+      const destColuna = zone.dataset.coluna;
+      const destGrupo  = zone.dataset.grupo || 'Geral';
+      if (destColuna === _kDragOrigemColuna && destGrupo === _kDragOrigemGrupo) return;
+      kanbanMoverProcesso(_kDragProcId, destColuna, destGrupo);
+      _kDragProcId = null;
+    });
+  });
+}
+
+// ── Gerenciar grupos (sub-blocos) ─────────────────────────────
+
+function kanbanAdicionarGrupo(colunaId) {
+  const nome = prompt('Nome do novo grupo:');
+  if (!nome?.trim()) return;
+  const grupos = kanbanGetGrupos();
+  if (!grupos[colunaId]) grupos[colunaId] = ['Geral'];
+  if (grupos[colunaId].includes(nome.trim())) {
+    showToast('Já existe um grupo com esse nome.'); return;
+  }
+  grupos[colunaId].push(nome.trim());
+  kanbanSalvarGrupos(grupos);
+  renderKanban();
+  showToast(`Grupo "${nome.trim()}" criado!`);
+}
+
+function kanbanRenomearGrupo(colunaId, nomeAtual) {
+  const novoNome = prompt('Novo nome para o grupo:', nomeAtual);
+  if (!novoNome?.trim() || novoNome.trim() === nomeAtual) return;
+  const grupos = kanbanGetGrupos();
+  const idx = grupos[colunaId]?.indexOf(nomeAtual);
+  if (idx < 0) return;
+  grupos[colunaId][idx] = novoNome.trim();
+  kanbanSalvarGrupos(grupos);
+  // Atualiza processos que estavam nesse grupo
+  const processos = ls('processos') || [];
+  let mudou = false;
+  processos.forEach(p => {
+    if (p.kanbanColuna === colunaId && p.kanbanGrupo === nomeAtual) {
+      p.kanbanGrupo = novoNome.trim();
+      mudou = true;
+    }
+  });
+  if (mudou) ls('processos', processos);
+  renderKanban();
+  showToast(`Grupo renomeado para "${novoNome.trim()}"`);
+}
+
+function kanbanExcluirGrupo(colunaId, nomeGrupo) {
+  if (nomeGrupo === 'Geral') { showToast('O grupo "Geral" não pode ser excluído.'); return; }
+  if (!confirm(`Excluir o grupo "${nomeGrupo}"?\n\nOs processos dentro dele serão movidos para "Geral".`)) return;
+  const grupos = kanbanGetGrupos();
+  grupos[colunaId] = grupos[colunaId].filter(g => g !== nomeGrupo);
+  if (!grupos[colunaId].length) grupos[colunaId] = ['Geral'];
+  kanbanSalvarGrupos(grupos);
+  // Move processos órfãos para Geral
+  const processos = ls('processos') || [];
+  let mudou = false;
+  processos.forEach(p => {
+    if (p.kanbanColuna === colunaId && p.kanbanGrupo === nomeGrupo) {
+      p.kanbanGrupo = 'Geral';
+      mudou = true;
+    }
+  });
+  if (mudou) ls('processos', processos);
+  renderKanban();
+  showToast(`Grupo "${nomeGrupo}" excluído. Processos movidos para "Geral".`);
+}
