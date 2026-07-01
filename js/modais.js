@@ -91,6 +91,26 @@ document.addEventListener('keydown', e => {
 });
 
 // ── MODAL PROCESSO: Novo/Editar ───────────────────────────────
+// Popula o select de subgrupos do Kanban conforme a coluna selecionada
+function _popularSubgruposKanban(colunaId, valorAtual) {
+  const sel = document.getElementById('proc-kanban-grupo');
+  if (!sel) return;
+  let grupos = {};
+  try {
+    let raw = ls('kanbanGrupos');
+    if (raw) {
+      if (typeof raw === 'string') raw = JSON.parse(raw);
+      if (typeof raw === 'string') raw = JSON.parse(raw);
+      grupos = raw || {};
+    }
+  } catch {}
+  const lista = grupos[colunaId] || ['Geral'];
+  sel.innerHTML = '<option value="">— Nenhum (Geral) —</option>' +
+    lista.filter(g => g !== 'Geral').map(g =>
+      `<option value="${g}" ${g === valorAtual ? 'selected' : ''}>${g}</option>`
+    ).join('');
+}
+
 function populateModalSelects() {
   const unidades = ls('unidades') || [];
   const oss = ls('oss') || [];
@@ -154,6 +174,13 @@ function openNovoProcesso() {
   });
   document.getElementById('proc-inicio').value = new Date().toISOString().split('T')[0];
   populateModalSelects();
+  // Kanban: padrão "A Fazer", sem subgrupo
+  const kanbanColEl = document.getElementById('proc-kanban-coluna');
+  if (kanbanColEl) {
+    kanbanColEl.value = 'afazer';
+    kanbanColEl.onchange = () => _popularSubgruposKanban(kanbanColEl.value, '');
+    _popularSubgruposKanban('afazer', '');
+  }
   setTimeout(() => {
     const statusEl = document.getElementById('proc-status');
     if (statusEl) {
@@ -198,6 +225,12 @@ function openEditarProcesso(id) {
     document.getElementById('proc-vig-inicio').value = p.vigInicio || '';
     document.getElementById('proc-vig-fim').value = p.vigFim || '';
     document.getElementById('proc-obs').value = p.obs || '';
+    const kanbanColEditEl = document.getElementById('proc-kanban-coluna');
+    if (kanbanColEditEl) {
+      kanbanColEditEl.value = p.kanbanColuna || 'afazer';
+      kanbanColEditEl.onchange = () => _popularSubgruposKanban(kanbanColEditEl.value, '');
+      _popularSubgruposKanban(p.kanbanColuna || 'afazer', p.kanbanGrupo || '');
+    }
     const scTop = document.getElementById('proc-status-cg-top');
     if (scTop) scTop.value = p.statusCG || '';
     const sc = document.getElementById('proc-status-cg');
@@ -268,6 +301,8 @@ function salvarProcesso() {
     status: document.getElementById('proc-status').value,
     fase: document.getElementById('proc-fase').value,
     obs: document.getElementById('proc-obs').value,
+    kanbanColuna: document.getElementById('proc-kanban-coluna')?.value || 'afazer',
+    kanbanGrupo: document.getElementById('proc-kanban-grupo')?.value || '',
     vigInicio: document.getElementById('proc-vig-inicio').value,
     vigFim: document.getElementById('proc-vig-fim').value,
     statusCG: document.getElementById('proc-status-cg-top')?.value || document.getElementById('proc-status-cg')?.value || '',
