@@ -438,6 +438,25 @@
         <div class="field-group"><label>Fase Atual</label><select id="proc-fase"><option value="">Selecionar...</option></select></div>
         <div class="field-group" style="grid-column:1/-1"><label>Observações</label><textarea id="proc-obs" rows="2" placeholder="Observações gerais sobre o processo..."></textarea></div>
       </div>
+      <div style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.6px;color:var(--text3);padding:12px 0 6px;border-bottom:1px solid var(--border);margin-bottom:14px">KANBAN</div>
+      <div class="form-grid">
+        <div class="field-group">
+          <label>Grupo (Coluna Kanban)</label>
+          <select id="proc-kanban-coluna">
+            <option value="afazer">A Fazer</option>
+            <option value="progresso">Em Progresso</option>
+            <option value="concluido">Concluído</option>
+            <option value="cancelado">Cancelado</option>
+          </select>
+        </div>
+        <div class="field-group">
+          <label>Subgrupo</label>
+          <select id="proc-kanban-grupo">
+            <option value="">— Nenhum (Geral) —</option>
+          </select>
+          <div class="field-hint">Subgrupos são criados pelo usuário na visualização Kanban.</div>
+        </div>
+      </div>
     </div>
     <div class="modal-footer">
       <button class="btn" onclick="closeModal('modal-processo')">Cancelar</button>
@@ -557,7 +576,7 @@
 // Define URL e token ANTES de db.js carregar,
 // para que o localStorage já esteja preenchido na aba anônima/nova máquina.
 const GTTRCG_CONFIG = {
-  appsScriptUrl: 'https://script.google.com/macros/s/AKfycbyTroFzmF-TTtvkwKq-tj1zQUibmVX3aEtZphMM8OCYuGbn6Fe-aG4_29iOBn0A0c38/exec',
+  appsScriptUrl: 'https://script.google.com/macros/s/AKfycbzESsfJZa6A9Yy0SwKBkjv36LqtC7_URa7bm95-63aBVKqqkN3O3EWaC0H0NJIYQ9W3/exec',
   apiToken: 'dgmcg@2025',
 };
 (function() {
