@@ -349,12 +349,18 @@ let _kDragOrigemGrupo = null;
 
 function kanbanGetGrupos() {
   try {
-    // Tenta ler do _DB (carregado do Sheets via getAllData → kanbanGrupos)
-    const raw = ls('kanbanGrupos');
+    let raw = ls('kanbanGrupos');
     if (!raw) return _kanbanGruposPadrao();
-    const parsed = typeof raw === 'string' ? JSON.parse(raw) : raw;
+    // Desserializa — pode vir como string JSON simples, duplo-serializado, ou já como objeto
+    if (typeof raw === 'string') {
+      try { raw = JSON.parse(raw); } catch { return _kanbanGruposPadrao(); }
+    }
+    // Se ainda for string após primeiro parse (dupla serialização), parseia de novo
+    if (typeof raw === 'string') {
+      try { raw = JSON.parse(raw); } catch { return _kanbanGruposPadrao(); }
+    }
+    const grupos = (raw && typeof raw === 'object') ? raw : {};
     // Garante que todas as colunas existem
-    const grupos = parsed || {};
     KANBAN_COLUNAS.forEach(c => { if (!grupos[c.id]) grupos[c.id] = ['Geral']; });
     return grupos;
   } catch { return _kanbanGruposPadrao(); }
@@ -367,8 +373,10 @@ function _kanbanGruposPadrao() {
 }
 
 function kanbanSalvarGrupos(cfg) {
-  // Salva como string JSON — o Apps Script grava via gravarConfig('kanbanGrupos', ...)
-  ls('kanbanGrupos', JSON.stringify(cfg));
+  // Salva como objeto — ls() agenda sync com Sheets
+  // O Apps Script recebe via setCollection('kanbanGrupos', cfg)
+  // e chama gravarConfig('kanbanGrupos', cfg) que serializa por conta própria
+  ls('kanbanGrupos', cfg);
 }
 
 // ── Ler/gravar coluna e grupo do processo ─────────────────────
@@ -397,7 +405,9 @@ function renderKanban() {
   const wrap = document.getElementById('kanban-view');
   if (!wrap) return;
 
-  const processos = filtrarProcessos();
+  // Usa todos os processos do banco — ignora filtros da sidebar/busca no Kanban
+  // para garantir que todos apareçam independente dos filtros da lista
+  const processos = ls('processos') || [];
   const grupos    = kanbanGetGrupos();
   const isAdmin   = APP.currentUser?.perfil === 'admin';
 
