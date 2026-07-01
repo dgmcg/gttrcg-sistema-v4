@@ -106,6 +106,27 @@ function buildCtRow(u) {
     ? `<span style="color:${prevCor}">${fmtDate(u.previsaoDate.toISOString().slice(0, 10))}${u.diasParaPrevisao < 0 ? ' ⚠' : ''}</span>`
     : '-';
 
+  // ── Início do Novo Processo ─────────────────────────────────
+  // Busca o processo mais recente (maior data de início) cujo nome
+  // de unidade coincide com o desta linha na tabela de contratos.
+  const processos = ls('processos') || [];
+  const procsDaUnidade = processos.filter(p =>
+    p.nome && u.nome &&
+    p.nome.trim().toLowerCase() === u.nome.trim().toLowerCase()
+  );
+  let inicioNovoProc = null;
+  if (procsDaUnidade.length > 0) {
+    const maisRecente = procsDaUnidade.reduce((a, b) => {
+      const da = a.inicio ? new Date(a.inicio) : new Date(0);
+      const db = b.inicio ? new Date(b.inicio) : new Date(0);
+      return da >= db ? a : b;
+    });
+    inicioNovoProc = maisRecente.inicio || null;
+  }
+  const inicioLabel = inicioNovoProc
+    ? `<span style="color:var(--green);font-weight:500">${fmtDate(inicioNovoProc)}</span>`
+    : `<span style="color:var(--text3)">—</span>`;
+
   const repasseLabel = u.repasse ? `<span style="font-family:var(--mono);font-size:11px">${fmtBRL(u.repasse)}</span>` : '-';
 
   return `<tr style="cursor:pointer" onclick="openEditarDadoFixo('unidades','${u.id}')" title="Clique para editar">
@@ -120,6 +141,7 @@ function buildCtRow(u) {
     <td style="font-family:var(--mono);font-size:12px">${fmtDate(u.cgFim)}</td>
     <td style="font-size:12px">${vig2Label}</td>
     <td style="font-size:12px">${prevLabel}</td>
+    <td style="font-size:12px">${inicioLabel}</td>
     <td style="font-family:var(--mono);font-size:12px">${diasLabel}</td>
     <td>${statusBadgeHtml(u.statusGeral)}</td>
     <td style="font-size:11px;text-align:right">${repasseLabel}</td>
@@ -251,13 +273,14 @@ function renderCtPorOss(data, ossSet) {
             <th style="padding:8px 10px;text-align:left;font-size:11px;color:var(--text2)">Fim CG</th>
             <th style="padding:8px 10px;text-align:left;font-size:11px;color:var(--text2)">Fim Vig. 2A</th>
             <th style="padding:8px 10px;text-align:left;font-size:11px;color:var(--text2)">Previsão Novo</th>
+            <th style="padding:8px 10px;text-align:left;font-size:11px;color:var(--text2)">Início Novo Proc.</th>
             <th style="padding:8px 10px;text-align:left;font-size:11px;color:var(--text2)">Dias p/ Fim</th>
             <th style="padding:8px 10px;text-align:left;font-size:11px;color:var(--text2)">Status</th>
             <th style="padding:8px 10px;text-align:right;font-size:11px;color:var(--text2)">Repasse</th>
           </tr></thead>
           <tbody>${unids.sort((a, b) => (a.diasFim ?? 99999) - (b.diasFim ?? 99999)).map(buildCtRow).join('')}</tbody>
           <tfoot><tr>
-            <td colspan="9" style="text-align:right;font-size:11px;color:var(--text3);padding:6px 10px">Total:</td>
+            <td colspan="10" style="text-align:right;font-size:11px;color:var(--text3);padding:6px 10px">Total:</td>
             <td style="text-align:right;font-weight:700;font-size:12px;color:var(--green);font-family:var(--mono);padding:6px 10px">${fmtBRL(totalRepasse)}/mês</td>
           </tr></tfoot>
         </table>
