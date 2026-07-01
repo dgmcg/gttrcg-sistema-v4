@@ -604,3 +604,23 @@ tbody td { padding: 10px 12px; vertical-align: middle; color: var(--text); }
   .form-grid-3 { grid-template-columns: 1fr; }
   #ct-kpis     { grid-template-columns: repeat(2, 1fr); }
 }
+
+/* ── Kanban v2 ─────────────────────────────────────────────── */
+.kv2-dropzone.drag-over,
+.kv2-col-dropzone.drag-over {
+  background: rgba(0,82,204,.08);
+  border: 2px dashed #0052CC;
+  border-radius: var(--radius);
+  min-height: 60px;
+}
+.kv2-card {
+  transition: transform .15s, box-shadow .15s;
+  user-select: none;
+}
+.kv2-card:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 4px 12px rgba(0,0,0,.2);
+}
+.kv2-card:active { cursor: grabbing; }
+.kv2-grupo { transition: box-shadow .15s; }
+.kv2-grupo:has(.drag-over) { box-shadow: 0 0 0 2px #0052CC; }
