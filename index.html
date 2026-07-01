@@ -424,7 +424,11 @@
         <div class="field-group"><label>Tipo de Processo</label><select id="proc-tipo-processo"><option value="">Selecionar...</option></select></div>
         <div class="field-group"><label>Área / NT Responsável</label><input type="text" id="proc-area-nt" list="list-setores" placeholder="Ex: SEAS/DGLCA"><datalist id="list-setores"></datalist><datalist id="list-pessoas"></datalist></div>
         <div class="field-group" id="proc-responsavel-container"><label>Responsável GTTRCG</label><select id="proc-responsavel"><option value="">— Selecionar responsável —</option></select></div>
-        <div class="field-group"><label>Data de Início</label><input type="date" id="proc-inicio"></div>
+        <div class="field-group">
+          <label>Início do Processo</label>
+          <input type="date" id="proc-inicio">
+          <div class="field-hint">Preenchido automaticamente com a data de hoje ao criar. Pode ser editado.</div>
+        </div>
         <div class="field-group"><label>Previsão de Conclusão</label><input type="date" id="proc-previsao"></div>
       </div>
       <div style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.6px;color:var(--text3);padding:12px 0 6px;border-bottom:1px solid var(--border);margin-bottom:14px">STATUS E FASE ATUAL</div>
