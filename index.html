@@ -348,7 +348,7 @@
             <div class="config-section-title">Usuários do Sistema</div>
             <button class="btn sm primary" onclick="openAdicionarUsuario()" id="btn-add-user">+ Usuário</button>
           </div>
-          <div class="config-section-body"><div class="config-list" id="usuarios-list"></div></div>
+          <div class="config-section-body"><div id="usuarios-list" style="display:flex;flex-direction:column;gap:4px"></div></div>
         </div>
       </div>
       <div id="tab-senha" class="tab-content">
@@ -576,7 +576,7 @@
 // Define URL e token ANTES de db.js carregar,
 // para que o localStorage já esteja preenchido na aba anônima/nova máquina.
 const GTTRCG_CONFIG = {
-  appsScriptUrl: 'https://script.google.com/macros/s/AKfycbzESsfJZa6A9Yy0SwKBkjv36LqtC7_URa7bm95-63aBVKqqkN3O3EWaC0H0NJIYQ9W3/exec',
+  appsScriptUrl: 'https://script.google.com/macros/s/AKfycbzFUdwHqCLqvqx2yBWhGJ1iRc7WueKqd2hfQIUPg5R0Db0U8y9pWCQhEwGLmEoi33za/exec',
   apiToken: 'dgmcg@2025',
 };
 (function() {
