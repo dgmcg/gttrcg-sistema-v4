@@ -511,19 +511,27 @@ async function salvarUsuario() {
   const users = ls('usuarios') || [];
   const id = document.getElementById('user-id-edit').value || genId();
   const idx = users.findIndex(u => u.id === id);
-  const senhaAtual = idx >= 0 ? users[idx].senha : null;
+
+  // Preserva todos os campos existentes do usuário (vindo do Sheets)
+  // e só sobrescreve os campos editáveis pelo formulário
+  const existente = idx >= 0 ? users[idx] : {};
+  const senhaAtual = existente.senha || null;
   let senhaFinal = senhaAtual;
   if (!senhaAtual) {
     if (typeof hashSenha === 'function') senhaFinal = await hashSenha('123');
     else senhaFinal = '123';
   }
+
   const obj = {
+    ...existente,          // preserva versaoNovidadesVista, cadastradoEm, etc.
     id, nome, login,
     matricula: document.getElementById('user-matricula')?.value.trim() || '',
     email: document.getElementById('user-email')?.value.trim() || '',
     perfil: document.getElementById('user-perfil').value,
     senha: senhaFinal,
+    ativo: existente.ativo !== undefined ? existente.ativo : 'TRUE',
   };
+
   if (idx >= 0) users[idx] = obj; else users.push(obj);
   ls('usuarios', users);
   closeModal('modal-usuario');
