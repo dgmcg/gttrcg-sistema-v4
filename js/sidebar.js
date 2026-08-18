@@ -158,27 +158,42 @@ function highlightSidebarItem(onclickFragment) {
 // ============================================================
 
 /**
- * Injeta dinamicamente os itens de tipo de unidade na sidebar
- * com base nos tiposUnidade dos dados fixos.
+ * Lê a lista de tipos que o admin marcou para aparecer na sidebar.
+ * Guardada na chave de config `tiposNaSidebar` (array de strings).
+ * Se nunca foi configurada, devolve null — indicando "todos".
+ */
+function getTiposNaSidebar() {
+  let raw = ls('tiposNaSidebar');
+  if (raw === null || raw === undefined || raw === '') return null;
+  try {
+    if (typeof raw === 'string') raw = JSON.parse(raw);
+    if (typeof raw === 'string') raw = JSON.parse(raw);
+  } catch { return null; }
+  return Array.isArray(raw) ? raw : null;
+}
+
+/**
+ * Injeta os itens de tipo de unidade na sidebar.
+ * - Exibe apenas os tipos marcados pelo admin em Configurações
+ * - Usa a grafia EXATA cadastrada em Tipos de Unidade
+ * - Respeita a ordem em que estão cadastrados
  */
 function initSidebarUnidades() {
-  const sidebar = document.getElementById('sidebar');
-  if (!sidebar) return;
+  const container = document.getElementById('sidebar-tipos-list');
+  const section   = document.getElementById('sidebar-unidades-section');
+  if (!container || !section) return;
 
-  const tiposUnidade = ls('tiposUnidade') || ['Hospital','UPA','UPAE','CER'];
-  const section = [...sidebar.querySelectorAll('.sidebar-section')]
-    .find(s => s.textContent.trim() === 'Unidades');
-  if (!section) return;
+  const todosTipos = ls('tiposUnidade') || [];
+  const marcados   = getTiposNaSidebar();
 
-  // Remove itens de tipo anteriores
-  let next = section.nextElementSibling;
-  while (next && next.classList.contains('sidebar-item') && !next.classList.contains('sidebar-section')) {
-    const tmp = next.nextElementSibling;
-    if ((next.getAttribute('onclick') || '').includes('filterSidebarTipo')) next.remove();
-    next = tmp;
-  }
+  // Mantém a ordem do cadastro; se nada foi configurado ainda, mostra todos
+  const tipos = marcados === null
+    ? todosTipos
+    : todosTipos.filter(t => marcados.includes(t));
 
-  // Ícone estrela da vida (saúde pública)
+  // Esconde o cabeçalho "Unidades" quando não há nenhum tipo para mostrar
+  section.style.display = tipos.length ? '' : 'none';
+
   const icon = `<svg width="14" height="14" viewBox="0 0 100 100" fill="currentColor">
     <rect x="43" y="5" width="14" height="90" rx="7"/>
     <rect x="43" y="5" width="14" height="90" rx="7" transform="rotate(60 50 50)"/>
@@ -186,14 +201,10 @@ function initSidebarUnidades() {
     <circle cx="50" cy="50" r="10"/>
   </svg>`;
 
-  // Cria items em ordem reversa para insertAfter
-  [...tiposUnidade].slice(0, 6).reverse().forEach(tipo => {
-    const item = document.createElement('div');
-    item.className = 'sidebar-item';
-    item.setAttribute('onclick', `filterSidebarTipo('${tipo}')`);
-    item.innerHTML = `${icon} ${tipo}s`;
-    section.after(item);
-  });
+  container.innerHTML = tipos.map(tipo => {
+    const esc = String(tipo).replace(/'/g, "\\'");
+    return `<div class="sidebar-item" onclick="filterSidebarTipo('${esc}')">${icon} ${tipo}</div>`;
+  }).join('');
 }
 
 // Inicia após DOM pronto — chamado pelo app.js após boot

@@ -11,35 +11,35 @@
 // Identificador da versão atual de novidades.
 // Atualize esta string sempre que publicar uma nova leva de
 // melhorias que mereça aviso aos usuários.
-const NOVIDADES_VERSAO = '2026-06-29';
+const NOVIDADES_VERSAO = '2026-08-18';
 
 const NOVIDADES_CONTEUDO = {
   titulo: 'Novidades no GTTRCG',
   itens: [
     {
-      icone: '🧩',
-      titulo: 'Campos personalizados nas etapas do fluxo',
-      texto: 'Em Fluxo do Processo, o administrador agora pode adicionar, remover e reordenar campos de cada etapa, escolhendo o tipo: texto, sim/não, data, valor em R$, lista fixa (puxada dos dados fixos) ou anexo de documento.',
+      icone: '⚡',
+      titulo: 'Frentes em Andamento',
+      texto: 'O sistema agora mostra automaticamente todas as etapas iniciadas e ainda não concluídas de um processo — no detalhe, na lista de Monitoramento, no Kanban e no Painel. Não precisa cadastrar nada: basta marcar a etapa como "Iniciada". Prazos vencidos aparecem destacados em vermelho.',
     },
     {
-      icone: '↕️',
-      titulo: 'Reordenação automática das etapas',
-      texto: 'Ao criar, editar ou excluir uma etapa, as demais se reorganizam automaticamente — sem buracos na numeração. Também é possível arrastar e soltar as etapas para reordenar.',
+      icone: '🔤',
+      titulo: 'Nome completo das OSS',
+      texto: 'Passe o mouse sobre a sigla de uma OSS em Monitoramento ou Contratos para ver o nome completo da entidade.',
     },
     {
-      icone: '📎',
-      titulo: 'Anexo de documentos',
-      texto: 'Campos do tipo "Anexo de Documento" agora permitem enviar arquivos (qualquer formato) direto na etapa do processo. O arquivo é salvo na pasta DOCUMENTOS GTTRCG do Google Drive e fica acessível por um link.',
+      icone: '🎛️',
+      titulo: 'Menu lateral personalizável',
+      texto: 'Em Configurações → Dados Fixos → Tipos de Unidade, o administrador pode marcar quais tipos aparecem como filtro no menu lateral, na seção Unidades.',
     },
     {
-      icone: '🔒',
-      titulo: 'Proteção contra preenchimento incorreto',
-      texto: 'Os campos de uma etapa só ficam disponíveis para edição depois que ela é marcada como "Iniciada" — evitando preencher informações em etapas que ainda não começaram.',
+      icone: '📋',
+      titulo: 'Contratos: tipo do processo em seleção',
+      texto: 'Na coluna "Início Novo Proc." agora aparece também o tipo do processo (Regular, Emergencial, Dispensa de Seleção) que está em curso para aquela unidade.',
     },
     {
-      icone: '⚠️',
-      titulo: 'Aviso ao sair sem salvar',
-      texto: 'Se você fizer alterações no acompanhamento de um processo e tentar fechar a janela (ou a aba do navegador) sem salvar, o sistema agora avisa antes de descartar.',
+      icone: '🔠',
+      titulo: 'Listas em ordem alfabética',
+      texto: 'Unidades de Saúde e Organizações Sociais agora aparecem sempre ordenadas alfabeticamente em Configurações.',
     },
   ],
 };

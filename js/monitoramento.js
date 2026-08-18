@@ -165,11 +165,11 @@ function renderMonitoramento() {
           <div class="td-sub">${p.municipio||''}</div>
         </td>
         <td><span class="badge ${tipoBadge(p.tipo)}">${p.tipo||'-'}</span></td>
-        <td style="color:var(--text3);font-size:12px">${p.oss||'-'}</td>
+        <td style="font-size:12px">${ossComTooltip(p.oss, 'color:var(--text3)')}</td>
         <td style="font-family:var(--mono);font-size:11px;color:var(--text3)">${p.sei?p.sei.slice(0,18)+'…':'-'}</td>
         <td><span class="badge ${statusBadge(p.status)}"
               style="max-width:180px;overflow:hidden;text-overflow:ellipsis;display:inline-block;font-size:11px">
-              ${p.status||'-'}</span></td>
+              ${p.status||'-'}</span>${badgesFrentesAtivas(p)}</td>
         <td style="font-size:12px;color:var(--text2)">${p.fase||'-'}</td>
         <td>${progressBar(p.progresso||0)}</td>
         <td style="color:var(--text3);font-size:12px">${fmtDate(p.inicio)}</td>
@@ -500,8 +500,9 @@ function renderKanban() {
               </div>
               <div style="display:flex;gap:4px;flex-wrap:wrap">
                 <span class="badge ${tipoBadge(p.tipo)}" style="font-size:10px">${p.tipo||'-'}</span>
-                <span style="font-size:10px;color:var(--text3)">${p.oss||''}</span>
+                ${p.oss ? ossComTooltip(p.oss, 'font-size:10px;color:var(--text3)') : ''}
               </div>
+              ${resumoFrentesKanban(p)}
               ${p.kanbanGrupo && p.kanbanGrupo !== 'Geral'
                 ? `<div style="font-size:10px;color:${col.cor};margin-top:3px">📌 ${p.kanbanGrupo}</div>`
                 : ''}
@@ -642,4 +643,55 @@ function kanbanExcluirGrupo(colunaId, nomeGrupo) {
   if (mudou) ls('processos', processos);
   renderKanban();
   showToast(`Grupo "${nomeGrupo}" excluído. Processos movidos para "Geral".`);
+}
+
+// ── FRENTES ATIVAS: exibição compacta ─────────────────────────
+/**
+ * Badges das frentes ativas exibidos abaixo do status na lista.
+ * Mostra até 2 frentes; o excedente vira "+N".
+ * Nada é exibido quando há 1 frente ou menos — nesse caso o status
+ * principal já basta e poluiria a tabela.
+ */
+function badgesFrentesAtivas(p) {
+  if (typeof getFrentesAtivas !== 'function') return '';
+  const frentes = getFrentesAtivas(p, ls('etapasFluxo') || []);
+  if (frentes.length < 2) return '';
+
+  const vencidas = frentes.filter(f => f.vencida).length;
+  const visiveis = frentes.slice(0, 2);
+  const resto = frentes.length - visiveis.length;
+
+  const chips = visiveis.map(f =>
+    `<span title="${String(f.nome).replace(/"/g,'&quot;')}"
+           style="font-size:9px;padding:1px 6px;border-radius:8px;
+                  background:${f.vencida ? 'rgba(218,54,51,.15)' : 'rgba(31,111,235,.12)'};
+                  color:${f.vencida ? 'var(--red2)' : 'var(--accent2)'};
+                  white-space:nowrap;max-width:120px;overflow:hidden;
+                  text-overflow:ellipsis;display:inline-block;vertical-align:middle">
+      ${f.vencida ? '⚠ ' : ''}${f.nome}
+    </span>`).join('');
+
+  return `<div style="display:flex;gap:3px;flex-wrap:wrap;margin-top:3px;align-items:center">
+    ${chips}
+    ${resto > 0 ? `<span style="font-size:9px;color:var(--text3)">+${resto}</span>` : ''}
+    ${vencidas ? `<span title="${vencidas} frente(s) com prazo vencido"
+        style="font-size:9px;color:var(--red2);font-weight:600">⚠${vencidas}</span>` : ''}
+  </div>`;
+}
+
+/** Linha-resumo das frentes ativas dentro do card do Kanban. */
+function resumoFrentesKanban(p) {
+  if (typeof getFrentesAtivas !== 'function') return '';
+  const frentes = getFrentesAtivas(p, ls('etapasFluxo') || []);
+  if (!frentes.length) return '';
+  const vencidas = frentes.filter(f => f.vencida).length;
+  const cor = vencidas ? 'var(--red2)' : 'var(--accent2)';
+  const txt = frentes.length === 1
+    ? frentes[0].nome
+    : `${frentes.length} frentes ativas`;
+  return `<div style="font-size:10px;color:${cor};margin-top:3px;
+               white-space:nowrap;overflow:hidden;text-overflow:ellipsis"
+          title="${frentes.map(f => (f.vencida?'⚠ ':'') + f.nome).join('\n').replace(/"/g,'&quot;')}">
+    ⚡ ${txt}${vencidas ? ` · ${vencidas} vencida${vencidas>1?'s':''}` : ''}
+  </div>`;
 }

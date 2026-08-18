@@ -228,3 +228,29 @@ function debounce(fn, ms = 300) {
 }
 
 console.log('[GTTRCG] utils.js carregado ✓');
+
+// ── OSS: sigla → nome completo ────────────────────────────────
+/**
+ * Retorna o nome completo da OSS a partir da sigla cadastrada.
+ * Usado para tooltips (atributo title) nas listagens.
+ * Se a OSS não existir no cadastro, devolve string vazia — não
+ * inventa nome nem repete a sigla.
+ */
+function nomeOssPorSigla(sigla) {
+  if (!sigla) return '';
+  const oss = ls('oss') || [];
+  const achou = oss.find(o =>
+    (o.sigla || '').trim().toLowerCase() === String(sigla).trim().toLowerCase()
+  );
+  return achou?.nome || '';
+}
+
+/** Monta o HTML de uma sigla de OSS com tooltip do nome completo. */
+function ossComTooltip(sigla, estilo) {
+  if (!sigla) return '<span style="color:var(--text3)">-</span>';
+  const nome = nomeOssPorSigla(sigla);
+  const style = estilo || '';
+  return nome
+    ? `<span style="${style};border-bottom:1px dotted var(--text3);cursor:help" title="${nome.replace(/"/g,'&quot;')}">${sigla}</span>`
+    : `<span style="${style}">${sigla}</span>`;
+}

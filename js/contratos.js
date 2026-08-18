@@ -115,6 +115,7 @@ function buildCtRow(u) {
     p.nome.trim().toLowerCase() === u.nome.trim().toLowerCase()
   );
   let inicioNovoProc = null;
+  let tipoNovoProc   = '';
   if (procsDaUnidade.length > 0) {
     const maisRecente = procsDaUnidade.reduce((a, b) => {
       const da = a.inicio ? new Date(a.inicio) : new Date(0);
@@ -122,9 +123,11 @@ function buildCtRow(u) {
       return da >= db ? a : b;
     });
     inicioNovoProc = maisRecente.inicio || null;
+    tipoNovoProc   = maisRecente.tipoProcesso || '';
   }
   const inicioLabel = inicioNovoProc
-    ? `<span style="color:var(--green);font-weight:500">${fmtDate(inicioNovoProc)}</span>`
+    ? `<span style="color:var(--green);font-weight:500">${fmtDate(inicioNovoProc)}</span>` +
+      (tipoNovoProc ? `<br><span style="font-size:10px;color:var(--text3)">(${tipoNovoProc})</span>` : '')
     : `<span style="color:var(--text3)">—</span>`;
 
   const repasseLabel = u.repasse ? `<span style="font-family:var(--mono);font-size:11px">${fmtBRL(u.repasse)}</span>` : '-';
@@ -136,7 +139,7 @@ function buildCtRow(u) {
       <div style="margin-top:3px">${statusBadgeHtml(u.statusCG || '-')}</div>
     </td>
     <td><span class="badge ${tipoBadge(u.tipo)}">${u.tipo || '-'}</span></td>
-    <td style="font-weight:600;font-size:12px">${u.ossSigla || u.ossGestora || '-'}</td>
+    <td style="font-size:12px">${ossComTooltip(u.ossSigla || u.ossGestora, 'font-weight:600')}</td>
     <td style="font-family:var(--mono);font-size:12px">${u.cg || '-'}</td>
     <td style="font-family:var(--mono);font-size:12px">${fmtDate(u.cgFim)}</td>
     <td style="font-size:12px">${vig2Label}</td>

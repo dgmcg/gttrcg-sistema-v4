@@ -72,6 +72,129 @@ function atualizarFaseProcesso(procId) {
   }
 }
 
+// ── FRENTES ATIVAS ────────────────────────────────────────────
+/**
+ * Retorna as "frentes ativas" de um processo: as etapas que foram
+ * marcadas como Iniciada e ainda NÃO foram concluídas.
+ *
+ * Deriva 100% do acompanhamento já preenchido pela equipe — não
+ * exige cadastro paralelo e nunca fica desatualizado.
+ *
+ * Cada frente traz: etapa, fase, subfase, responsável, prazo e
+ * se o prazo está vencido.
+ */
+function getFrentesAtivas(processo, etapas) {
+  if (!processo?.acompanhamento) return [];
+  const todas = etapas || ls('etapasFluxo') || [];
+  const hoje  = new Date(); hoje.setHours(0, 0, 0, 0);
+
+  return etapasOrdenadas(todas)
+    .filter(e => {
+      const ac = processo.acompanhamento[e.id] || {};
+      return ac._iniciado === true && ac._concluido !== true;
+    })
+    .map(e => {
+      const ac = processo.acompanhamento[e.id] || {};
+      let diasRestantes = null, vencida = false;
+      if (ac._prazo) {
+        const prazo = new Date(ac._prazo + 'T12:00:00');
+        if (!isNaN(prazo.getTime())) {
+          diasRestantes = Math.ceil((prazo - hoje) / 86400000);
+          vencida = diasRestantes < 0;
+        }
+      }
+      return {
+        etapaId: e.id,
+        nome: e.nome,
+        fase: e.fase,
+        subfase: e.subfase || '',
+        responsavel: ac._responsavel || '',
+        prazo: ac._prazo || '',
+        iniciadaEm: ac._iniciado_em || '',
+        diasRestantes,
+        vencida,
+      };
+    });
+}
+
+/** Nome legível da fase a partir da chave interna. */
+function labelFase(faseKey) {
+  return ({
+    planejamento: 'Planejamento',
+    externa: 'Externa (SAD)',
+    contratacao: 'Contratação',
+  })[faseKey] || faseKey || '-';
+}
+
+/**
+ * Painel de Frentes Ativas exibido no detalhe do processo.
+ * Somente leitura — reflete o estado real das etapas.
+ */
+function renderPainelFrentesAtivas(p, etapas) {
+  const frentes = getFrentesAtivas(p, etapas);
+
+  if (!frentes.length) {
+    return `<div id="painel-frentes-ativas" style="margin-bottom:16px;padding:10px 12px;background:var(--bg2);
+                 border:1px solid var(--border);border-radius:var(--radius);
+                 font-size:12px;color:var(--text3)">
+      Nenhuma frente em andamento. Marque uma etapa como <strong>Iniciada</strong> para que ela apareça aqui.
+    </div>`;
+  }
+
+  const vencidas = frentes.filter(f => f.vencida).length;
+
+  const itens = frentes.map(f => {
+    let prazoHtml = '<span style="color:var(--text3)">sem prazo</span>';
+    if (f.prazo) {
+      const cor = f.vencida ? 'var(--red2)' : f.diasRestantes <= 7 ? 'var(--yellow2)' : 'var(--text3)';
+      const txt = f.vencida
+        ? `venceu há ${Math.abs(f.diasRestantes)}d`
+        : `${f.diasRestantes}d restantes`;
+      prazoHtml = `<span style="color:${cor}">${fmtDate(f.prazo)} · ${txt}</span>`;
+    }
+    return `<div style="display:flex;align-items:flex-start;gap:10px;padding:8px 10px;
+                 background:var(--bg);border:1px solid ${f.vencida ? 'var(--red2)' : 'var(--border)'};
+                 border-left:3px solid ${f.vencida ? 'var(--red2)' : 'var(--accent2)'};
+                 border-radius:var(--radius)">
+      <div style="flex:1;min-width:0">
+        <div style="font-size:12px;font-weight:500;color:var(--text)">${f.vencida ? '⚠ ' : ''}${f.nome}</div>
+        <div style="font-size:11px;color:var(--text3);margin-top:2px">
+          ${labelFase(f.fase)}${f.subfase ? ' · ' + f.subfase : ''}
+          ${f.responsavel ? ' · 👤 ' + f.responsavel : ''}
+        </div>
+      </div>
+      <div style="font-size:11px;text-align:right;flex-shrink:0">${prazoHtml}</div>
+    </div>`;
+  }).join('');
+
+  return `<div style="margin-bottom:16px" id="painel-frentes-ativas">
+    <div style="display:flex;align-items:center;gap:8px;margin-bottom:8px">
+      <span style="font-size:12px;font-weight:600;color:var(--text2)">⚡ Frentes em Andamento</span>
+      <span style="font-size:11px;background:rgba(31,111,235,.15);color:var(--accent2);
+                   padding:2px 8px;border-radius:10px;font-weight:600">${frentes.length}</span>
+      ${vencidas ? `<span style="font-size:11px;background:rgba(218,54,51,.15);color:var(--red2);
+                   padding:2px 8px;border-radius:10px;font-weight:600">${vencidas} vencida${vencidas>1?'s':''}</span>` : ''}
+      <span style="font-size:10px;color:var(--text3);margin-left:auto">atualizado automaticamente pelas etapas</span>
+    </div>
+    <div style="display:flex;flex-direction:column;gap:5px">${itens}</div>
+  </div>`;
+}
+
+/**
+ * Redesenha o painel de frentes sem fechar/reabrir o modal.
+ * Chamado sempre que uma etapa é marcada como Iniciada/Concluída.
+ */
+function atualizarPainelFrentes(procId) {
+  const painel = document.getElementById('painel-frentes-ativas');
+  if (!painel) return;
+  const p = (ls('processos') || []).find(x => x.id === procId);
+  if (!p) return;
+  const wrapper = document.createElement('div');
+  wrapper.innerHTML = renderPainelFrentesAtivas(p, ls('etapasFluxo') || []);
+  const novo = wrapper.firstElementChild;
+  if (novo) painel.replaceWith(novo);
+}
+
 // ── REORDENAÇÃO AUTOMÁTICA DE ETAPAS DENTRO DA FASE ───────────
 /**
  * Recebe o array completo de etapas e GARANTE que, dentro de cada
@@ -341,6 +464,7 @@ function openDetalhe(id) {
       <span id="detalhe-progresso-display" style="font-size:13px;font-weight:600;color:var(--accent2)">${calcProgressoProcesso(p, etapas)}%</span>
       <span style="font-size:11px;color:var(--text3)">(auto)</span>
     </div>
+    ${renderPainelFrentesAtivas(p, etapas)}
     ${renderLinhaDoTempo(p, etapas)}
   `;
 
@@ -720,6 +844,7 @@ function marcarEtapaIniciada(procId, etapaId, checked) {
   const avisoEl = document.getElementById('bloqueio-aviso-' + etapaId);
   if (avisoEl) avisoEl.style.display = checked ? 'none' : 'flex';
 
+  atualizarPainelFrentes(procId);
   UndoStack?.updateBtn?.();
 }
 
@@ -754,6 +879,7 @@ function marcarEtapaConcluida(procId, etapaId, checked) {
     item.className = item.className.replace(/done|active-step|pending/g, '') + ' pending';
     if (num) num.className = 'etapa-num pending';
   }
+  atualizarPainelFrentes(procId);
   UndoStack?.updateBtn?.();
 }
 

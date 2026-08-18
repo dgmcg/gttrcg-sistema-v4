@@ -126,13 +126,30 @@ function renderDadosFixos() {
       <div class="config-section-body">`;
 
     if (isSimple) {
+      // Só a categoria tiposUnidade tem a coluna de flag da sidebar
+      const temFlagSidebar = cat.key === 'tiposUnidade';
+      const marcados = temFlagSidebar ? (getTiposNaSidebar() ?? data) : [];
+
+      if (temFlagSidebar) {
+        html += `<div style="font-size:11px;color:var(--text3);padding:4px 2px 10px;line-height:1.5">
+          Marque os tipos que devem aparecer como filtro no menu lateral, em <strong>Unidades</strong>.
+          A ordem exibida é a mesma desta lista.
+        </div>`;
+      }
+
       html += `<div style="display:flex;flex-direction:column;gap:4px">`;
       data.forEach((item, i) => {
+        const checked = temFlagSidebar && marcados.includes(item) ? 'checked' : '';
+        const esc = String(item).replace(/'/g, "\\'");
         html += `<div style="display:flex;align-items:center;gap:6px;padding:5px 8px;background:var(--bg2);border:1px solid var(--border);border-radius:var(--radius)">
           <div style="display:flex;flex-direction:column;gap:1px;opacity:.6">
             <button onclick="moverItemConfig('${cat.key}',${i},-1)" style="background:none;border:none;color:var(--text3);cursor:pointer;font-size:10px;padding:0;line-height:1">▲</button>
             <button onclick="moverItemConfig('${cat.key}',${i},1)" style="background:none;border:none;color:var(--text3);cursor:pointer;font-size:10px;padding:0;line-height:1">▼</button>
           </div>
+          ${temFlagSidebar && isAdmin ? `<label title="Exibir no menu lateral" style="display:flex;align-items:center;gap:5px;cursor:pointer;flex-shrink:0">
+            <input type="checkbox" ${checked} onchange="toggleTipoNaSidebar('${esc}', this.checked)" style="cursor:pointer">
+            <span style="font-size:10px;color:var(--text3)">Menu</span>
+          </label>` : ''}
           <span style="flex:1;font-size:13px">${item}</span>
           <button class="btn sm" onclick="openEditarDadoFixo('${cat.key}',${i})" style="font-size:11px">✎</button>
         </div>`;
@@ -143,7 +160,13 @@ function renderDadosFixos() {
         html += `<div style="font-size:13px;color:var(--text3);padding:12px">Nenhum item cadastrado.</div>`;
       } else {
         html += `<div class="config-list" style="max-height:320px;overflow-y:auto">`;
-        data.forEach(item => {
+        // Ordena alfabeticamente APENAS para exibição (cópia do array).
+        // Não reordena nem regrava o array original — evita reescrever
+        // todas as linhas do Sheets e poluir o log de auditoria.
+        const dataOrdenada = [...data].sort((a, b) =>
+          String(a?.nome || '').localeCompare(String(b?.nome || ''), 'pt-BR', { sensitivity: 'base' })
+        );
+        dataOrdenada.forEach(item => {
           const d = getItemDisplay(item, cat.key);
           const subFields = (schema || []).filter(f => f.key !== (schema[0]?.key)).slice(0, 2);
           const subText = subFields.map(f => item[f.key]).filter(Boolean).join(' · ');
@@ -203,6 +226,27 @@ function renderDadosFixos() {
   </div>`;
 
   document.getElementById('dados-tabs-container').innerHTML = html;
+}
+
+/**
+ * Marca/desmarca um tipo de unidade para aparecer no menu lateral.
+ * A lista é gravada na chave de config `tiposNaSidebar` e é
+ * compartilhada por toda a equipe (vive no Sheets, não no navegador).
+ * A ordem gravada segue sempre a ordem do cadastro de Tipos de Unidade.
+ */
+function toggleTipoNaSidebar(tipo, marcado) {
+  const todos = ls('tiposUnidade') || [];
+  const atuais = getTiposNaSidebar() ?? todos;
+  let novos = marcado
+    ? [...new Set([...atuais, tipo])]
+    : atuais.filter(t => t !== tipo);
+
+  // Reordena conforme a ordem do cadastro
+  novos = todos.filter(t => novos.includes(t));
+
+  ls('tiposNaSidebar', novos);
+  if (typeof initSidebarUnidades === 'function') initSidebarUnidades();
+  showToast(marcado ? `"${tipo}" adicionado ao menu lateral` : `"${tipo}" removido do menu lateral`);
 }
 
 function salvarPrazoAlerta() {

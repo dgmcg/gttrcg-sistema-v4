@@ -85,7 +85,6 @@ function renderDashboard() {
   const andamento = processos.filter(p =>
     !['Aguardando Início do Processo','Contratação Concluída'].includes(p.status)
   );
-  const remetidos  = processos.filter(p => p.status?.toLowerCase().includes('remetido'));
   const concluidos = processos.filter(p => p.status?.toLowerCase().includes('concluída'));
   const alertas    = typeof gerarAlertas === 'function' ? gerarAlertas() : [];
 
@@ -102,11 +101,6 @@ function renderDashboard() {
         <div class="label">Em Andamento</div>
         <div class="value">${andamento.length}</div>
         <div class="sub">Processos ativos</div>
-      </div>
-      <div class="stat-card blue">
-        <div class="label">Remetidos à SAD</div>
-        <div class="value">${remetidos.length}</div>
-        <div class="sub">Fase externa</div>
       </div>
       <div class="stat-card green">
         <div class="label">Concluídos</div>
@@ -161,6 +155,32 @@ function renderChartsGeral(processos) {
       <div class="bar-value">${n}</div>
     </div>`).join('');
 
+  // ── Frentes ativas por fase ──────────────────────────────────
+  // Conta FRENTES (etapas iniciadas e não concluídas), não processos.
+  // Um processo com 3 frentes contribui 3 vezes aqui — e isso é
+  // correto, porque a unidade de medida deste gráfico é a frente.
+  const etapasAll = ls('etapasFluxo') || [];
+  const frentesPorFase = {};
+  let totalFrentes = 0, totalVencidas = 0;
+  processos.forEach(p => {
+    (typeof getFrentesAtivas === 'function' ? getFrentesAtivas(p, etapasAll) : []).forEach(f => {
+      const k = typeof labelFase === 'function' ? labelFase(f.fase) : f.fase;
+      if (!frentesPorFase[k]) frentesPorFase[k] = { total: 0, vencidas: 0 };
+      frentesPorFase[k].total++;
+      totalFrentes++;
+      if (f.vencida) { frentesPorFase[k].vencidas++; totalVencidas++; }
+    });
+  });
+
+  const frenteEntries = Object.entries(frentesPorFase).sort((a, b) => b[1].total - a[1].total);
+  const maxF = Math.max(...frenteEntries.map(x => x[1].total), 1);
+  const barsFrentes = frenteEntries.map(([fase, d], i) => `
+    <div class="bar-row">
+      <div class="bar-label">${fase}</div>
+      <div class="bar-track"><div class="bar-fill" style="width:${(d.total/maxF)*100}%;background:${barColors[i%6]}"></div></div>
+      <div class="bar-value">${d.total}${d.vencidas ? ` <span style="color:var(--red2);font-size:10px">⚠${d.vencidas}</span>` : ''}</div>
+    </div>`).join('');
+
   chartsRow.innerHTML = `
     <div class="chart-wrap">
       <div class="chart-title">Processos por Status</div>
@@ -169,6 +189,13 @@ function renderChartsGeral(processos) {
     <div class="chart-wrap">
       <div class="chart-title">Processos por Tipo de Unidade</div>
       <div class="bar-chart">${barsTipo || '<div style="color:var(--text3);font-size:12px">Sem processos</div>'}</div>
+    </div>
+    <div class="chart-wrap">
+      <div class="chart-title">
+        Frentes Ativas por Fase
+        ${totalFrentes ? `<span style="font-size:11px;font-weight:400;color:var(--text3);margin-left:6px">${totalFrentes} no total${totalVencidas ? ` · <span style="color:var(--red2)">${totalVencidas} vencida${totalVencidas>1?'s':''}</span>` : ''}</span>` : ''}
+      </div>
+      <div class="bar-chart">${barsFrentes || '<div style="color:var(--text3);font-size:12px">Nenhuma etapa iniciada em andamento</div>'}</div>
     </div>`;
 }
 
