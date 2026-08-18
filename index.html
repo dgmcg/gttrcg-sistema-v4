@@ -113,23 +113,8 @@
       <svg width="14" height="14" viewBox="0 0 16 16" fill="currentColor"><path d="M9.5 0H4a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h8a2 2 0 0 0 2-2V4.5L9.5 0zm0 1v2A1.5 1.5 0 0 0 11 4.5h2V14a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1V2a1 1 0 0 1 1-1h5.5z"/></svg>
       Ag. Assinatura <span class="sidebar-count" id="sidebar-assinatura">0</span>
     </div>
-    <div class="sidebar-section">Unidades</div>
-    <div class="sidebar-item" onclick="filterSidebarTipo('Hospital')">
-      <svg width="14" height="14" viewBox="0 0 16 16" fill="currentColor"><rect x="1" y="3" width="14" height="11" rx="1" fill="none" stroke="currentColor" stroke-width="1.5"/><path d="M7 7v4M5 9h6M8 3V1"/></svg>
-      Hospitais
-    </div>
-    <div class="sidebar-item" onclick="filterSidebarTipo('UPA')">
-      <svg width="14" height="14" viewBox="0 0 16 16" fill="currentColor"><path d="M3 14s-1 0-1-1 1-4 6-4 6 3 6 4-1 1-1 1H3zm5-6a3 3 0 1 0 0-6 3 3 0 0 0 0 6z"/></svg>
-      UPAs
-    </div>
-    <div class="sidebar-item" onclick="filterSidebarTipo('UPAE')">
-      <svg width="14" height="14" viewBox="0 0 16 16" fill="currentColor"><path d="M3 14s-1 0-1-1 1-4 6-4 6 3 6 4-1 1-1 1H3zm5-6a3 3 0 1 0 0-6 3 3 0 0 0 0 6z"/></svg>
-      UPAEs
-    </div>
-    <div class="sidebar-item" onclick="filterSidebarTipo('CER')">
-      <svg width="14" height="14" viewBox="0 0 16 16" fill="currentColor"><path d="M3 14s-1 0-1-1 1-4 6-4 6 3 6 4-1 1-1 1H3zm5-6a3 3 0 1 0 0-6 3 3 0 0 0 0 6z"/></svg>
-      CERs
-    </div>
+    <div class="sidebar-section" id="sidebar-unidades-section">Unidades</div>
+    <div id="sidebar-tipos-list"></div>
     <div class="sidebar-section">Favoritos</div>
     <div class="sidebar-item" onclick="filterSidebarFavoritos()">
       <svg width="14" height="14" viewBox="0 0 16 16" fill="currentColor"><path d="M3.612 15.443c-.386.198-.824-.149-.746-.592l.83-4.73L.173 6.765c-.329-.314-.158-.888.283-.95l4.898-.696L7.538.792c.197-.39.73-.39.927 0l2.184 4.327 4.898.696c.441.062.612.636.282.95l-3.522 3.356.83 4.73c.078.443-.36.79-.746.592L8 13.187l-4.389 2.256z"/></svg>
@@ -576,7 +561,7 @@
 // Define URL e token ANTES de db.js carregar,
 // para que o localStorage já esteja preenchido na aba anônima/nova máquina.
 const GTTRCG_CONFIG = {
-  appsScriptUrl: 'https://script.google.com/macros/s/AKfycbzESsfJZa6A9Yy0SwKBkjv36LqtC7_URa7bm95-63aBVKqqkN3O3EWaC0H0NJIYQ9W3/exec',
+  appsScriptUrl: 'https://script.google.com/macros/s/AKfycbzFUdwHqCLqvqx2yBWhGJ1iRc7WueKqd2hfQIUPg5R0Db0U8y9pWCQhEwGLmEoi33za/exec',
   apiToken: 'dgmcg@2025',
 };
 (function() {
