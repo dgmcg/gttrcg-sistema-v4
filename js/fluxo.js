@@ -12,7 +12,10 @@ function processoEstaConcluido(p, etapas) {
     if (fo[a.fase] !== fo[b.fase]) return fo[a.fase] - fo[b.fase];
     return (a.ordem || 0) - (b.ordem || 0);
   });
-  const ultima = sorted[sorted.length - 1];
+  // Ignora etapas marcadas como "Não se Aplica": o processo está concluído
+  // quando a última etapa APLICÁVEL estiver concluída.
+  const aplicaveis = sorted.filter(e => p.acompanhamento?.[e.id]?._naoAplica !== true);
+  const ultima = aplicaveis[aplicaveis.length - 1];
   if (!ultima) return false;
   return !!(p.acompanhamento?.[ultima.id]?._concluido);
 }
@@ -91,6 +94,7 @@ function getFrentesAtivas(processo, etapas) {
   return etapasOrdenadas(todas)
     .filter(e => {
       const ac = processo.acompanhamento[e.id] || {};
+      if (ac._naoAplica === true) return false;
       return ac._iniciado === true && ac._concluido !== true;
     })
     .map(e => {
@@ -476,11 +480,12 @@ function openDetalhe(id) {
       <div class="etapas-list">`;
     etapasFase.forEach((e, idx) => {
       const acomp = (p.acompanhamento || {})[e.id] || {};
-      const isDone = acomp._concluido === true;
-      const isInit = acomp._iniciado === true;
+      const isNA   = acomp._naoAplica === true;
+      const isDone = !isNA && acomp._concluido === true;
+      const isInit = !isNA && acomp._iniciado === true;
       const isActive = !isDone && isInit;
-      const cls = isDone ? 'done' : (isActive ? 'active-step' : 'pending');
-      const numCls = isDone ? 'done' : (isActive ? 'active' : 'pending');
+      const cls = isNA ? 'nao-aplica' : (isDone ? 'done' : (isActive ? 'active-step' : 'pending'));
+      const numCls = isNA ? 'na' : (isDone ? 'done' : (isActive ? 'active' : 'pending'));
       const res = calcProgressoEtapa(e, acomp);
       const pCor = res.pct >= 100 ? 'var(--green)' : res.pct > 0 ? 'var(--accent2)' : 'var(--text3)';
       const respAtual = acomp._responsavel || '';
@@ -488,13 +493,13 @@ function openDetalhe(id) {
 
       html += `<div class="etapa-item ${cls}" id="etapa-item-${e.id}">
         <div class="etapa-header" onclick="toggleEtapa('${e.id}')">
-          <div class="etapa-num ${numCls}">${isDone ? '✓' : (idx + 1)}</div>
+          <div class="etapa-num ${numCls}">${isNA ? 'N/A' : (isDone ? '✓' : (idx + 1))}</div>
           <div class="etapa-info">
-            <div class="etapa-nome">${e.nome}</div>
+            <div class="etapa-nome"${isNA ? ' style="text-decoration:line-through;opacity:.65"' : ''}>${e.nome}</div>
             <div class="etapa-resp">${e.responsavel || ''} · ${e.subfase || ''}</div>
           </div>
           <div class="etapa-actions" style="flex-shrink:0;display:flex;align-items:center;gap:6px">
-            ${isDone ? '<span class="badge green" style="font-size:10px">Concluído</span>' : (isActive ? '<span class="badge blue pulse" style="font-size:10px">Em andamento</span>' : '')}
+            ${isNA ? '<span class="badge" style="font-size:10px;background:var(--bg3);color:var(--text3);border-color:var(--border2)">Não se aplica</span>' : (isDone ? '<span class="badge green" style="font-size:10px">Concluído</span>' : (isActive ? '<span class="badge blue pulse" style="font-size:10px">Em andamento</span>' : ''))}
             <div style="display:flex;align-items:center;gap:5px;min-width:80px">
               <div style="width:48px;height:4px;background:var(--bg3);border-radius:2px;overflow:hidden"><div style="width:${res.pct}%;height:100%;background:${pCor}"></div></div>
               <span style="font-size:10px;color:${pCor}">${res.pct}%</span>
@@ -504,16 +509,19 @@ function openDetalhe(id) {
         </div>
         <div class="etapa-body" id="etapa-body-${e.id}">
           <div style="font-size:11px;color:var(--text3);margin-bottom:10px;padding:6px 8px;background:var(--bg2);border-radius:var(--radius)">${e.acao || ''}</div>
-          ${!isInit ? `<div class="etapa-bloqueio-aviso" id="bloqueio-aviso-${e.id}" style="display:flex;align-items:center;gap:6px;font-size:12px;color:var(--yellow2);background:rgba(210,153,34,.1);border:1px solid rgba(210,153,34,.3);padding:7px 10px;border-radius:var(--radius);margin-bottom:10px">
+          ${isNA ? `<div style="display:flex;align-items:center;gap:6px;font-size:12px;color:var(--text3);background:var(--bg3);border:1px solid var(--border2);padding:7px 10px;border-radius:var(--radius);margin-bottom:10px">
+            Etapa marcada como <strong>Não se Aplica</strong> — considerada 100% atendida e fora do fluxo deste processo.
+          </div>` : ''}
+          ${!isInit && !isNA ? `<div class="etapa-bloqueio-aviso" id="bloqueio-aviso-${e.id}" style="display:flex;align-items:center;gap:6px;font-size:12px;color:var(--yellow2);background:rgba(210,153,34,.1);border:1px solid rgba(210,153,34,.3);padding:7px 10px;border-radius:var(--radius);margin-bottom:10px">
             <svg viewBox="0 0 16 16" fill="currentColor" width="13" height="13" style="flex-shrink:0"><path d="M8.982 1.566a1.13 1.13 0 0 0-1.96 0L.165 13.233c-.457.778.091 1.767.98 1.767h13.713c.889 0 1.438-.99.98-1.767L8.982 1.566zM8 5c.535 0 .954.462.9.995l-.35 3.507a.552.552 0 0 1-1.1 0L7.1 5.995A.905.905 0 0 1 8 5zm.002 6a1 1 0 1 1 0 2 1 1 0 0 1 0-2z"/></svg>
             Marque <strong>"Iniciada"</strong> abaixo para liberar a edição dos campos desta etapa.
           </div>` : ''}
-          <div class="etapa-fields" id="etapa-fields-${e.id}" ${!isInit ? 'style="opacity:.5;pointer-events:none"' : ''}>`;
+          <div class="etapa-fields" id="etapa-fields-${e.id}" ${(!isInit || isNA) ? 'style="opacity:.5;pointer-events:none"' : ''}>`;
 
       (e.campos || []).forEach(campo => {
         const fid = `ef_${e.id}_${campo.label.replace(/\s+/g, '_')}`;
         const val = acomp[campo.label] !== undefined ? acomp[campo.label] : '';
-        const dis = !isInit ? 'disabled' : '';
+        const dis = (!isInit || isNA) ? 'disabled' : '';
 
         if (campo.tipo === 'boolean') {
           html += `<div class="etapa-field"><label>${campo.label}</label>
@@ -521,6 +529,7 @@ function openDetalhe(id) {
               <option value="">-</option>
               <option value="true"${val === 'true' ? ' selected' : ''}>Sim</option>
               <option value="false"${val === 'false' ? ' selected' : ''}>Não</option>
+              <option value="na"${val === 'na' ? ' selected' : ''}>N/A</option>
             </select></div>`;
         } else if (campo.tipo === 'date') {
           html += `<div class="etapa-field"><label>${campo.label}</label><input type="date" id="${fid}" data-etapa="${e.id}" data-campo="${campo.label}" value="${val}" ${dis}></div>`;
@@ -558,12 +567,16 @@ function openDetalhe(id) {
           </div>
           <div style="margin-top:10px;display:flex;gap:12px;align-items:center;flex-wrap:wrap">
             <label style="display:flex;align-items:center;gap:6px;cursor:pointer;font-size:12px;color:var(--accent2)">
-              <input type="checkbox" id="ef_${e.id}_init" ${isInit ? 'checked' : ''} onchange="marcarEtapaIniciada('${id}','${e.id}',this.checked)">
+              <input type="checkbox" id="ef_${e.id}_init" ${isInit ? 'checked' : ''} ${isNA ? 'disabled' : ''} onchange="marcarEtapaIniciada('${id}','${e.id}',this.checked)">
               Iniciada
             </label>
-            <label style="display:flex;align-items:center;gap:6px;cursor:pointer;font-size:12px;color:var(--green)">
-              <input type="checkbox" id="ef_${e.id}_done" ${isDone ? 'checked' : ''} onchange="marcarEtapaConcluida('${id}','${e.id}',this.checked)">
+            <label style="display:flex;align-items:center;gap:6px;cursor:pointer;font-size:12px;color:var(--green)${isNA ? ';opacity:.4' : ''}">
+              <input type="checkbox" id="ef_${e.id}_done" ${isDone ? 'checked' : ''} ${isNA ? 'disabled' : ''} onchange="marcarEtapaConcluida('${id}','${e.id}',this.checked)">
               Concluída
+            </label>
+            <label title="Esta etapa não integra este processo" style="display:flex;align-items:center;gap:6px;cursor:pointer;font-size:12px;color:var(--text3)">
+              <input type="checkbox" id="ef_${e.id}_na" ${isNA ? 'checked' : ''} onchange="marcarEtapaNaoAplica('${id}','${e.id}',this.checked)">
+              Não se Aplica
             </label>
           </div>
         </div>
@@ -845,6 +858,96 @@ function marcarEtapaIniciada(procId, etapaId, checked) {
   if (avisoEl) avisoEl.style.display = checked ? 'none' : 'flex';
 
   atualizarPainelFrentes(procId);
+  UndoStack?.updateBtn?.();
+}
+
+/**
+ * Marca/desmarca uma etapa como "Não se Aplica".
+ *
+ * Ao MARCAR:
+ *  - pede confirmação explícita, avisando que os dados serão apagados
+ *  - apaga TODOS os campos preenchidos, o responsável, o prazo, a obs
+ *    e os vínculos de documentos anexados
+ *  - limpa _iniciado/_concluido (a etapa sai do fluxo)
+ *  - a etapa passa a contar como 100% atendida no progresso
+ *
+ * Os arquivos já enviados permanecem no Drive; apenas o vínculo com a
+ * etapa é removido. A ação fica registrada no log de auditoria do
+ * Apps Script (aba _log), com usuário e data/hora.
+ */
+function marcarEtapaNaoAplica(procId, etapaId, checked) {
+  const processos = ls('processos') || [];
+  const idx = processos.findIndex(p => p.id === procId);
+  if (idx < 0) return;
+
+  const etapas = ls('etapasFluxo') || [];
+  const etapa  = etapas.find(e => e.id === etapaId);
+  const acAtual = processos[idx].acompanhamento?.[etapaId] || {};
+
+  if (checked) {
+    // Verifica se há algo a perder, para dar um aviso honesto
+    const camposComDados = (etapa?.campos || [])
+      .filter(c => { const v = acAtual[c.label]; return v !== undefined && v !== null && v !== ''; });
+    const temAnexos = (etapa?.campos || [])
+      .some(c => c.tipo === 'pdf' && acAtual[c.label]);
+    const temControles = acAtual._responsavel || acAtual._prazo || acAtual._obs
+      || acAtual._iniciado || acAtual._concluido;
+
+    let msg = `Marcar "${etapa?.nome || 'esta etapa'}" como NÃO SE APLICA?\n\n`;
+    msg += 'A etapa passará a contar como 100% atendida no progresso do processo.\n\n';
+
+    if (camposComDados.length || temControles) {
+      msg += '⚠ ATENÇÃO: os dados abaixo serão APAGADOS:\n';
+      if (camposComDados.length) msg += `• ${camposComDados.length} campo(s) preenchido(s)\n`;
+      if (temAnexos)             msg += '• Documentos anexados (o vínculo será removido)\n';
+      if (acAtual._responsavel)  msg += `• Responsável: ${acAtual._responsavel}\n`;
+      if (acAtual._prazo)        msg += '• Prazo definido\n';
+      if (acAtual._obs)          msg += '• Observações\n';
+      if (acAtual._iniciado || acAtual._concluido) msg += '• Marcações de Iniciada/Concluída\n';
+      msg += '\nEsta ação ficará registrada no log do sistema.\n\nDeseja continuar?';
+    } else {
+      msg += 'Deseja continuar?';
+    }
+
+    if (!confirm(msg)) {
+      // Desfaz o clique no checkbox
+      const cb = document.getElementById(`ef_${etapaId}_na`);
+      if (cb) cb.checked = false;
+      return;
+    }
+
+    // Zera a etapa e marca como N/A
+    processos[idx].acompanhamento = processos[idx].acompanhamento || {};
+    processos[idx].acompanhamento[etapaId] = {
+      _naoAplica: true,
+      _naoAplica_em: new Date().toISOString().split('T')[0],
+      _naoAplica_por: APP.currentUser?.login || '?',
+    };
+  } else {
+    // Desmarcar: etapa volta ao fluxo, zerada
+    processos[idx].acompanhamento = processos[idx].acompanhamento || {};
+    processos[idx].acompanhamento[etapaId] = {};
+  }
+
+  const etapasAll = ls('etapasFluxo') || [];
+  processos[idx].progresso = calcProgressoProcesso(processos[idx], etapasAll);
+  ls('processos', processos);
+  atualizarFaseProcesso(procId);
+
+  const pdEl = document.getElementById('detalhe-progresso-display');
+  if (pdEl) pdEl.textContent = processos[idx].progresso + '%';
+
+  // Re-renderiza o detalhe para refletir o novo estado visual da etapa
+  const scrollY = document.querySelector('#modal-detalhe .modal-body')?.scrollTop || 0;
+  openDetalhe(procId);
+  setTimeout(() => {
+    const body = document.querySelector('#modal-detalhe .modal-body');
+    if (body) body.scrollTop = scrollY;
+  }, 60);
+
+  showToast(checked
+    ? `Etapa marcada como "Não se Aplica" — dados apagados.`
+    : `Etapa reativada no fluxo.`);
   UndoStack?.updateBtn?.();
 }
 

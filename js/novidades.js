@@ -11,11 +11,21 @@
 // Identificador da versão atual de novidades.
 // Atualize esta string sempre que publicar uma nova leva de
 // melhorias que mereça aviso aos usuários.
-const NOVIDADES_VERSAO = '2026-08-18';
+const NOVIDADES_VERSAO = '2026-08-20';
 
 const NOVIDADES_CONTEUDO = {
   titulo: 'Novidades no GTTRCG',
   itens: [
+    {
+      icone: '🚫',
+      titulo: 'Etapas que não se aplicam',
+      texto: 'Cada etapa agora tem a opção "Não se Aplica", ao lado de Iniciada e Concluída. Use quando a etapa não integra aquele processo: ela passa a contar como 100% atendida no progresso. Atenção: ao marcar, os dados e anexos já preenchidos naquela etapa são apagados — o sistema pede confirmação antes.',
+    },
+    {
+      icone: '☑️',
+      titulo: 'Campos Sim/Não agora têm N/A',
+      texto: 'Todos os campos de Sim/Não passaram a aceitar também "N/A", para registrar itens que não se aplicam ao processo sem precisar deixar o campo em branco.',
+    },
     {
       icone: '⚡',
       titulo: 'Frentes em Andamento',

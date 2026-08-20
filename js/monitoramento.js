@@ -267,10 +267,14 @@ function inferEtapaAtual(p, etapas) {
   const sorted = etapasOrdenadas(etapas);
   const iniciada = sorted.find(e => {
     const ac = p.acompanhamento[e.id] || {};
-    return ac._iniciado && !ac._concluido;
+    return ac._naoAplica !== true && ac._iniciado && !ac._concluido;
   });
   if (iniciada) return iniciada;
-  return sorted.find(e => !(p.acompanhamento[e.id]||{})._concluido) || null;
+  // Próxima pendente, ignorando etapas que não se aplicam a este processo
+  return sorted.find(e => {
+    const ac = p.acompanhamento[e.id] || {};
+    return ac._naoAplica !== true && !ac._concluido;
+  }) || null;
 }
 
 // ============================================================

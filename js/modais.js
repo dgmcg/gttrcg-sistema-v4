@@ -335,7 +335,7 @@ const LISTAS_FIXAS_DISPONIVEIS = [
 
 const TIPOS_CAMPO_ETAPA = [
   { value: 'text',      label: 'Texto' },
-  { value: 'boolean',   label: 'Sim / Não' },
+  { value: 'boolean',   label: 'Sim / Não / N/A' },
   { value: 'date',      label: 'Data' },
   { value: 'moeda',     label: 'Valor (R$)' },
   { value: 'listafixo', label: 'Lista Fixa (dados fixos)' },

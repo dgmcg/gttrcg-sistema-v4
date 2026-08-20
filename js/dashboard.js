@@ -13,6 +13,9 @@
 
 function calcProgressoEtapa(etapa, acomp) {
   const ac     = acomp || {};
+  // Etapa marcada como "Não se Aplica" conta como integralmente atendida:
+  // ela não integra o fluxo deste processo, então não pode penalizar o progresso.
+  if (ac._naoAplica === true) return { pct: 100, preenchidos: 1, total: 1, naoAplica: true };
   const campos = (etapa.campos || []).filter(c => c.tipo !== 'pdf');
   const total  = 1 + campos.length + 1;
   let preenchidos = 0;
