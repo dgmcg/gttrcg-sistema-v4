@@ -624,3 +624,19 @@ tbody td { padding: 10px 12px; vertical-align: middle; color: var(--text); }
 .kv2-card:active { cursor: grabbing; }
 .kv2-grupo { transition: box-shadow .15s; }
 .kv2-grupo:has(.drag-over) { box-shadow: 0 0 0 2px #0052CC; }
+
+/* ── Etapa marcada como "Não se Aplica" ────────────────────── */
+.etapa-item.nao-aplica {
+  opacity: .72;
+  background: var(--bg2);
+  border-style: dashed;
+}
+.etapa-item.nao-aplica:hover { opacity: .9; }
+.etapa-num.na {
+  background: var(--bg3);
+  color: var(--text3);
+  border: 1px dashed var(--border2);
+  font-size: 9px;
+  font-weight: 700;
+  letter-spacing: -.3px;
+}
