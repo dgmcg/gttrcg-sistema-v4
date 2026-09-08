@@ -39,9 +39,17 @@ const GTTRCG_CONFIG_DEFAULTS = {
 // ============================================================
 
 /**
- * lsLocal(key, val) — grava APENAS no localStorage, SEM sincronizar com Sheets.
- * Usado exclusivamente pelo initData para não sobrescrever o banco com
- * valores padrão quando o localStorage está vazio em uma nova máquina.
+ * ⚠ OBSOLETO — NÃO USE EM CÓDIGO NOVO.
+ *
+ * lsLocal(key, val) grava APENAS no localStorage, sem sincronizar com o Sheets.
+ * Sobrou da arquitetura antiga (modo offline). Hoje os dados vêm sempre do
+ * Sheets no boot, e nenhum dado de negócio deve ficar no navegador.
+ *
+ * Mantido apenas porque initData() (também obsoleto, e não chamado por
+ * ninguém) documenta os valores-padrão de primeira instalação, úteis caso
+ * seja preciso recriar o banco do zero.
+ *
+ * Para qualquer gravação real, use ls().
  */
 function lsLocal(key, val) {
   if (val !== undefined) {
@@ -52,6 +60,11 @@ function lsLocal(key, val) {
   return v ? JSON.parse(v) : null;
 }
 
+/**
+ * ⚠ OBSOLETO — não é chamado por nenhum ponto do sistema.
+ * Serve como referência dos valores-padrão de primeira instalação.
+ * NÃO chame esta função: ela grava no localStorage, não no banco.
+ */
 function initData() {
   // REGRA CRÍTICA: initData usa lsLocal() — NUNCA ls() — para não disparar
   // gravarNoSheets() e sobrescrever o banco com arrays vazios em novos clientes.

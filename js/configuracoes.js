@@ -51,7 +51,7 @@ function getCatConfig(key) {
         schema.push({ key: 'repasse', label: 'Repasse Mensal (R$)', tipo: 'moeda', protegido: false });
         changed = true;
       }
-      if (changed) localStorage.setItem('gttrcg_schema_' + key, JSON.stringify(schema));
+      if (changed) ls('schema_' + key, schema);
     }
     if (schema) return { fields: schema.map(f => f.key), schema };
     const defaults = {

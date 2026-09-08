@@ -87,6 +87,8 @@ async function doLogin() {
   injectLogoffMenu();
   injectUndoButton();
   if (typeof updateSidebarCounts === 'function') updateSidebarCounts();
+  // Recalcula progressos com os dados já carregados do Sheets
+  if (typeof recalcAllProgressos === 'function') recalcAllProgressos();
   showPage('dashboard');
 
   // Exibe o modal de novidades se esta versão ainda não foi vista pelo usuário

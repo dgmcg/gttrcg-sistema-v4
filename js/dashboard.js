@@ -527,12 +527,14 @@ function recalcAllProgressos() {
     if (p.progresso !== pct) { p.progresso = pct; changed = true; }
   });
   if (changed) {
-    // Salva direto no localStorage sem trigggar sync (evita loop)
-    localStorage.setItem('gttrcg_processos', JSON.stringify(processos));
+    // Sincroniza com o Sheets — o progresso recalculado precisa ficar
+    // igual para todos os usuários, não só nesta máquina.
+    ls('processos', processos);
   }
 }
 
-// Roda uma vez na carga para garantir consistência
-setTimeout(recalcAllProgressos, 500);
+// Chamado pelo doLogin(), quando os dados do Sheets já estão em memória.
+// (Antes rodava por setTimeout fixo e podia executar com _DB ainda vazio,
+//  saindo sem recalcular nada.)
 
 console.log('[GTTRCG] dashboard.js carregado ✓');
