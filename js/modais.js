@@ -346,9 +346,38 @@ function autoFillUnidade() {
 function salvarProcesso() {
   const nome = document.getElementById('proc-unidade').value;
   if (!nome) { alert('Selecione uma unidade!'); return; }
+
+  // Tipo de Processo é obrigatório: é ele que define quais etapas do
+  // fluxo serão acompanhadas neste processo
+  const tipoProc = document.getElementById('proc-tipo-processo')?.value || '';
+  if (!tipoProc) {
+    alert('Selecione o Tipo de Processo.\n\nÉ ele que define quais etapas do fluxo aparecerão no acompanhamento.');
+    document.getElementById('proc-tipo-processo')?.focus();
+    return;
+  }
+
   const processos = ls('processos') || [];
   const id = document.getElementById('proc-id').value || genId();
   const idx = processos.findIndex(p => p.id === id);
+
+  // Trocar o tipo de um processo em andamento esconde etapas já preenchidas
+  if (idx >= 0 && (processos[idx].tipoProcesso || '') !== tipoProc) {
+    const ac = processos[idx].acompanhamento || {};
+    const perdidas = etapasForaDoTipo(processos[idx], tipoProc)
+      .filter(e => {
+        const a = ac[e.id] || {};
+        return a._iniciado || a._concluido || Object.keys(a).some(k => !k.startsWith('_') && a[k]);
+      });
+    if (perdidas.length) {
+      const lista = perdidas.slice(0, 6).map(e => '• ' + e.nome).join('\n');
+      const resto = perdidas.length > 6 ? `\n… e mais ${perdidas.length - 6}` : '';
+      const ok = confirm(
+        `Ao mudar o tipo para "${tipoProc}", ${perdidas.length} etapa(s) já preenchida(s) deixarão de aparecer no acompanhamento:\n\n${lista}${resto}\n\n` +
+        'Os dados NÃO serão apagados — continuam guardados e voltam a aparecer se o tipo for revertido.\n\nDeseja continuar?'
+      );
+      if (!ok) return;
+    }
+  }
   const obj = {
     id, nome,
     favorito: idx >= 0 ? (processos[idx].favorito || false) : false,
@@ -424,11 +453,23 @@ function openAdicionarEtapa() {
   });
   document.getElementById('etapa-fase-edit').value = 'planejamento';
   _populateSubfaseSelect('');
+  _renderTiposDaEtapa('');
   _camposEtapaEdit = [];
   renderListaCamposEtapa();
   _sugerirProximaPosicao('planejamento');
   document.getElementById('btn-excluir-etapa').style.display = 'none';
   openModal('modal-etapa-fluxo');
+}
+
+/**
+ * Desenha o seletor "Tipos de Processo" da etapa, reaproveitando o mesmo
+ * widget de múltipla escolha usado nos campos de lista fixa.
+ * O valor fica em #etapa-tipos-edit no formato "Tipo A; Tipo B".
+ */
+function _renderTiposDaEtapa(valorAtual) {
+  const wrap = document.getElementById('etapa-tipos-wrap');
+  if (!wrap) return;
+  wrap.innerHTML = renderCampoMultiSelect('etapa-tipos-edit', 'tiposProcesso', valorAtual || '', '', false);
 }
 
 // Sugere a próxima posição livre (última + 1) da fase selecionada.
@@ -455,6 +496,7 @@ function editarEtapaFluxo(id) {
   document.getElementById('etapa-ordem-edit').value = e.ordem || '';
   document.getElementById('etapa-acao-edit').value = e.acao || '';
   _populateSubfaseSelect(e.subfase || '');
+  _renderTiposDaEtapa(e.tipos || '');
   // Clona os campos da etapa para o estado de edição
   _camposEtapaEdit = (e.campos || []).map(c => ({ ...c }));
   renderListaCamposEtapa();

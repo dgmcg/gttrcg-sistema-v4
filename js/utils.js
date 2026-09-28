@@ -210,6 +210,40 @@ function getListaItens(key) {
   }).filter(x => x.value);
 }
 
+/* ── Etapas aplicáveis a um processo ──────────────────────────
+ *
+ * Cada etapa do fluxo declara a quais tipos de processo pertence
+ * (campo "tipos", no formato "Tipo A; Tipo B"). Esta função devolve
+ * apenas as etapas do tipo do processo informado — é a fonte única
+ * dessa regra em todo o sistema (progresso, frentes, linha do tempo,
+ * alertas, Kanban e o acompanhamento).
+ *
+ * Duas salvaguardas deliberadas, para nunca esconder trabalho já feito:
+ *  • processo sem tipo definido → recebe todas as etapas;
+ *  • etapa sem tipo definido    → vale para todos os tipos.
+ */
+function etapasDoProcesso(processo, etapas) {
+  const todas = etapas || ls('etapasFluxo') || [];
+  const tipoProc = (processo?.tipoProcesso || '').trim();
+  if (!tipoProc) return todas;
+  return todas.filter(e => {
+    const tiposEtapa = multiParaArray(e.tipos);
+    if (!tiposEtapa.length) return true;
+    return tiposEtapa.includes(tipoProc);
+  });
+}
+
+/** Etapas que o processo NÃO usa — para avisar antes de trocar o tipo. */
+function etapasForaDoTipo(processo, tipoNovo, etapas) {
+  const todas = etapas || ls('etapasFluxo') || [];
+  const alvo = (tipoNovo || '').trim();
+  if (!alvo) return [];
+  return todas.filter(e => {
+    const tiposEtapa = multiParaArray(e.tipos);
+    return tiposEtapa.length && !tiposEtapa.includes(alvo);
+  });
+}
+
 /* ── Calcula cor de alerta por dias restantes ── */
 function corPorDias(dias) {
   if (dias === null) return 'var(--text3)';

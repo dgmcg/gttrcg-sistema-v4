@@ -57,7 +57,7 @@ function gerarAlertas() {
 
   // ── 3. Etapas com prazo vencido ou próximo ───────────────
   processos.forEach(p => {
-    etapas.forEach(e => {
+    etapasDoProcesso(p, etapas).forEach(e => {
       const ac = (p.acompanhamento || {})[e.id] || {};
       if (ac._concluido || !ac._prazo) return;
       const diasParaVencer = Math.ceil((new Date(ac._prazo + 'T23:59:59') - hoje) / 86400000);
@@ -101,7 +101,7 @@ function gerarAlertas() {
   const curUser = APP.currentUser;
   if (curUser && curUser.login !== 'admin') {
     processos.forEach(p => {
-      etapas.forEach(e => {
+      etapasDoProcesso(p, etapas).forEach(e => {
         const ac = (p.acompanhamento || {})[e.id] || {};
         if (ac._responsavel !== curUser.login || ac._concluido) return;
         const jaExiste = alertas.some(a => a._atribuicao && a.pid === p.id && a.etapaId === e.id);

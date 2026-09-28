@@ -247,6 +247,36 @@ function filterSidebarFavoritos() {
 }
 
 // ============================================================
+// MIGRAÇÃO — tipos de processo nas etapas do fluxo
+// ============================================================
+
+/** Tipo atribuído às etapas cadastradas antes deste campo existir. */
+const TIPO_PADRAO_ETAPAS = 'Ordinário - Nova Seleção';
+
+/**
+ * Preenche o campo "tipos" das etapas que ainda não o têm.
+ *
+ * Roda uma única vez: assim que uma etapa recebe um tipo — seja por esta
+ * migração, seja porque o usuário a editou — ela deixa de ser tocada.
+ * A escolha feita pelo usuário nunca é sobrescrita.
+ */
+function migrarTiposDasEtapas() {
+  const etapas = ls('etapasFluxo') || [];
+  if (!etapas.length) return;
+
+  const semTipo = etapas.filter(e => !String(e.tipos || '').trim());
+  if (!semTipo.length) return;
+
+  // Usa o tipo padrão se ele existir na lista cadastrada; senão, o primeiro
+  const tiposCad = (ls('tiposProcesso') || []).map(t => (typeof t === 'string' ? t : t?.nome || t?.valor || ''));
+  const tipoAlvo = tiposCad.includes(TIPO_PADRAO_ETAPAS) ? TIPO_PADRAO_ETAPAS : (tiposCad[0] || TIPO_PADRAO_ETAPAS);
+
+  semTipo.forEach(e => { e.tipos = tipoAlvo; });
+  ls('etapasFluxo', etapas);
+  console.log(`[GTTRCG] ${semTipo.length} etapa(s) sem tipo receberam "${tipoAlvo}"`);
+}
+
+// ============================================================
 // BOOT DO SISTEMA
 // ============================================================
 
@@ -264,6 +294,10 @@ async function bootSistema() {
 
   // 2. Dados em memória — garante admin existe
   garantirAdminMaster();
+
+  // 2b. Etapas antigas, cadastradas antes do campo "Tipos de Processo",
+  //     recebem o tipo padrão uma única vez
+  migrarTiposDasEtapas();
 
   // 3. Exibe a tela de login
   const loginScreen = document.getElementById('login-screen');

@@ -89,9 +89,8 @@ function filtrarProcessos() {
 
   // Filtro por usuário responsável
   if (userF) {
-    const etapas = ls('etapasFluxo') || [];
     processos = processos.filter(p =>
-      etapas.some(e =>
+      etapasDoProcesso(p).some(e =>
         p.acompanhamento?.[e.id]?._responsavel === userF &&
         !p.acompanhamento?.[e.id]?._concluido
       )

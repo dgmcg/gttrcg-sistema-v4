@@ -29,6 +29,8 @@ function calcProgressoEtapa(etapa, acomp) {
 }
 
 function calcProgressoProcesso(processo, etapas) {
+  // Só as etapas do tipo deste processo entram na conta
+  etapas = etapasDoProcesso(processo, etapas);
   if (!etapas || !etapas.length) return 0;
   const ac = processo.acompanhamento || {};
   let totalCriterios = 0, preenchidosTotal = 0;
@@ -47,7 +49,7 @@ function calcProgressoProcesso(processo, etapas) {
 // diasEntre, fmtDuracao → utils.js
 
 function processoEstaConcluido(p, etapas) {
-  const sorted = etapasOrdenadas(etapas);
+  const sorted = etapasOrdenadas(etapasDoProcesso(p, etapas));
   const ultima = sorted[sorted.length - 1];
   if (!ultima) return false;
   return !!(p.acompanhamento?.[ultima.id]?._concluido);
@@ -55,6 +57,7 @@ function processoEstaConcluido(p, etapas) {
 
 function getDuracaoProcesso(p, etapas) {
   if (!p.inicio) return null;
+  etapas = etapasDoProcesso(p, etapas);
   if (processoEstaConcluido(p, etapas)) {
     const sorted   = etapasOrdenadas(etapas);
     const ultima   = sorted[sorted.length - 1];
@@ -280,7 +283,7 @@ function renderDashEquipe() {
   });
 
   processos.forEach(p => {
-    etapas.forEach(e => {
+    etapasDoProcesso(p, etapas).forEach(e => {
       const ac = p.acompanhamento?.[e.id] || {};
       if (!ac._responsavel || !userStats[ac._responsavel]) return;
       const us    = userStats[ac._responsavel];

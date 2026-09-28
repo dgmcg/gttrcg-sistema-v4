@@ -22,6 +22,7 @@ function processoEstaConcluido(p, etapas) {
 
 function getDuracaoProcesso(p, etapas) {
   if (!p.inicio) return null;
+  etapas = etapasDoProcesso(p, etapas);
   if (processoEstaConcluido(p, etapas)) {
     const sorted = [...etapas].sort((a, b) => {
       const fo = { planejamento: 0, externa: 1, contratacao: 2 };
@@ -37,10 +38,10 @@ function getDuracaoProcesso(p, etapas) {
 // ── Fase automática do processo ───────────────────────────────
 function atualizarFaseProcesso(procId) {
   const processos = ls('processos') || [];
-  const etapas = ls('etapasFluxo') || [];
   const idx = processos.findIndex(p => p.id === procId);
   if (idx < 0) return;
   const p = processos[idx];
+  const etapas = etapasDoProcesso(p);
 
   const subfaseMap = {};
   etapas.forEach(e => {
@@ -88,7 +89,7 @@ function atualizarFaseProcesso(procId) {
  */
 function getFrentesAtivas(processo, etapas) {
   if (!processo?.acompanhamento) return [];
-  const todas = etapas || ls('etapasFluxo') || [];
+  const todas = etapasDoProcesso(processo, etapas);
   const hoje  = new Date(); hoje.setHours(0, 0, 0, 0);
 
   return etapasOrdenadas(todas)
@@ -264,6 +265,18 @@ function removerEtapaComReordenacao(etapas, etapaId) {
 }
 
 // ── RENDERIZAR FLUXO (visão geral) ────────────────────────────
+/**
+ * Marcadores com os tipos de processo aos quais a etapa pertence,
+ * exibidos logo abaixo do nome na visão geral do fluxo.
+ */
+function _chipsTiposEtapa(tipos) {
+  const lista = multiParaArray(tipos);
+  if (!lista.length) {
+    return '<span class="tipo-chip sem-tipo" title="Etapa sem tipo definido — aparece em todos os processos">Sem tipo definido</span>';
+  }
+  return lista.map(t => `<span class="tipo-chip">${escHtml(t)}</span>`).join('');
+}
+
 function renderFluxo() {
   const etapas = ls('etapasFluxo') || [];
   const isAdmin = APP.currentUser?.perfil === 'admin';
@@ -288,6 +301,7 @@ function renderFluxo() {
         <div class="fluxo-node-icon" style="background:${f.color}22;color:${f.color};font-size:11px;font-weight:700">${e.ordem}</div>
         <div class="fluxo-node-content">
           <div class="fluxo-node-title">${e.nome}</div>
+          <div class="fluxo-node-tipos">${_chipsTiposEtapa(e.tipos)}</div>
           <div class="fluxo-node-data">
             <span class="fluxo-data-chip">RESP: ${e.responsavel || '-'}</span>
             <span class="fluxo-data-chip">FASE: ${e.subfase || '-'}</span>
@@ -367,6 +381,14 @@ function moverEtapaParaPosicaoDe(origemId, destinoId) {
 function salvarEtapaFluxo() {
   const nome = document.getElementById('etapa-nome-edit').value.trim();
   if (!nome) { alert('Informe o nome da etapa!'); return; }
+
+  // Tipos de processo aos quais a etapa pertence — obrigatório
+  const tipos = (document.getElementById('etapa-tipos-edit')?.value || '').trim();
+  if (!tipos) {
+    alert('Selecione ao menos um Tipo de Processo para esta etapa.\n\nEla só aparecerá no acompanhamento dos processos dos tipos escolhidos.');
+    return;
+  }
+
   let etapas = ls('etapasFluxo') || [];
   const id = document.getElementById('etapa-id-edit').value || genId();
 
@@ -382,7 +404,7 @@ function salvarEtapaFluxo() {
   const posicaoDesejada = parseInt(document.getElementById('etapa-ordem-edit').value) || null;
 
   const obj = {
-    id, nome,
+    id, nome, tipos,
     fase: document.getElementById('etapa-fase-edit').value,
     responsavel: document.getElementById('etapa-resp-edit').value,
     subfase: document.getElementById('etapa-subfase-edit').value,
@@ -427,7 +449,8 @@ function openDetalhe(id) {
     openEditarProcesso(id);
   };
 
-  const etapas = ls('etapasFluxo') || [];
+  // Apenas as etapas do tipo deste processo entram no acompanhamento
+  const etapas = etapasDoProcesso(p);
   const dur = getDuracaoProcesso(p, etapas);
   const durChip = dur ? (() => {
     const cor = dur.concluido ? 'var(--green)' : (dur.dias > 180 ? 'var(--red2)' : dur.dias > 90 ? 'var(--yellow2)' : 'var(--accent2)');
@@ -609,7 +632,7 @@ function openDetalhe(id) {
 function renderLinhaDoTempo(p, etapas) {
   const linhas = [];
   const hoje = new Date();
-  etapas.forEach(e => {
+  etapasDoProcesso(p, etapas).forEach(e => {
     const ac = (p.acompanhamento || {})[e.id] || {};
     if (!ac._iniciado && !ac._concluido) return;
     const resp = ac._responsavel ? (() => {
