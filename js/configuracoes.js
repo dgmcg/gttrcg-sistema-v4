@@ -343,7 +343,16 @@ function salvarDadoFixo() {
     document.querySelectorAll('[id^="dado-field-"][data-fieldkey]').forEach(el => {
       obj[el.dataset.fieldkey] = el.value?.trim ? el.value.trim() : el.value;
     });
-    if (!obj[cat.fields[0]]) { alert('Preencha o campo obrigatório: ' + cat.fields[0]); return; }
+    // Campo obrigatório = o campo PROTEGIDO (🔒 Nome), não o primeiro da lista.
+    // Antes era cat.fields[0]: reordenar os campos trocava silenciosamente qual
+    // campo passava a ser exigido. Agora a ordem é apenas apresentação.
+    const campoObrig = (cat.schema || []).find(f => f.key === 'nome')
+                    || (cat.schema || []).find(f => f.protegido)
+                    || { key: cat.fields[0], label: cat.fields[0] };
+    if (!obj[campoObrig.key]) {
+      alert('Preencha o campo obrigatório: ' + (campoObrig.label || campoObrig.key));
+      return;
+    }
     if (key === 'unidades' && obj.cgFim) {
       const prazo = ls('prazoAlerta') || 18;
       const fim = new Date(obj.cgFim + 'T12:00:00');
@@ -479,7 +488,9 @@ function renderSchemaModal(schema, title) {
   const lista = document.getElementById('schema-fields-list');
   const cur = ls('schema_' + schemaEditKey) || schema;
   lista.innerHTML = cur.map((f, i) => `
-    <div style="display:flex;align-items:center;gap:8px;padding:8px 10px;background:var(--bg1);border:1px solid var(--border);border-radius:var(--radius)">
+    <div class="schema-row" draggable="false" data-idx="${i}"
+         style="display:flex;align-items:center;gap:8px;padding:8px 10px;background:var(--bg1);border:1px solid var(--border);border-radius:var(--radius)">
+      <div class="schema-drag-handle" title="Arraste para reordenar">⠿</div>
       <div style="flex:1;min-width:0">
         <div style="font-size:13px;font-weight:500">${f.label} ${f.protegido ? '🔒' : ''}</div>
         <div style="font-size:10px;color:var(--text3);font-family:var(--mono)">${f.key} · ${f.tipo}</div>
@@ -491,9 +502,107 @@ function renderSchemaModal(schema, title) {
         <option value="moeda" ${f.tipo === 'moeda' ? 'selected' : ''}>Moeda</option>
         <option value="listafixo" ${f.tipo === 'listafixo' ? 'selected' : ''}>Lista Fixa</option>
       </select>
-      <input type="text" value="${f.label}" onchange="renomearCampoSchema(${i},this.value)" style="width:180px;font-size:12px;padding:4px 8px" ${f.protegido ? 'readonly' : ''}>
-      ${f.protegido ? '<div style="width:28px"></div>' : `<button class="btn sm icon danger" onclick="excluirCampoSchema(${i})"><svg viewBox="0 0 16 16" fill="currentColor" width="12" height="12"><path d="M5.5 5.5A.5.5 0 0 1 6 6v6a.5.5 0 0 1-1 0V6a.5.5 0 0 1 .5-.5zm2.5 0a.5.5 0 0 1 .5.5v6a.5.5 0 0 1-1 0V6a.5.5 0 0 1 .5-.5zm3 .5a.5.5 0 0 0-1 0v6a.5.5 0 0 0 1 0V6z"/><path fill-rule="evenodd" d="M14.5 3a1 1 0 0 1-1 1H13v9a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V4h-.5a1 1 0 0 1-1-1V2a1 1 0 0 1 1-1H6a1 1 0 0 1 1-1h2a1 1 0 0 1 1 1h3.5a1 1 0 0 1 1 1v1zM4.118 4 4 4.059V13a1 1 0 0 0 1 1h6a1 1 0 0 0 1-1V4.059L11.882 4H4.118zM2.5 3V2h11v1h-11z"/></svg></button>`}
+      <input type="text" value="${f.label}" onchange="renomearCampoSchema(${i},this.value)" style="width:160px;font-size:12px;padding:4px 8px" ${f.protegido ? 'readonly' : ''}>
+      <div style="display:flex;flex-direction:column;gap:1px">
+        <button type="button" class="btn-ordem" title="Mover para cima"
+                onclick="moverCampoSchema(${i},-1)" ${i === 0 ? 'disabled' : ''}>▲</button>
+        <button type="button" class="btn-ordem" title="Mover para baixo"
+                onclick="moverCampoSchema(${i},1)" ${i === cur.length - 1 ? 'disabled' : ''}>▼</button>
+      </div>
+      ${f.protegido ? '<div style="width:28px"></div>' : `<button class="btn sm icon danger" title="Excluir campo" onclick="excluirCampoSchema(${i})"><svg viewBox="0 0 16 16" fill="currentColor" width="12" height="12"><path d="M5.5 5.5A.5.5 0 0 1 6 6v6a.5.5 0 0 1-1 0V6a.5.5 0 0 1 .5-.5zm2.5 0a.5.5 0 0 1 .5.5v6a.5.5 0 0 1-1 0V6a.5.5 0 0 1 .5-.5zm3 .5a.5.5 0 0 0-1 0v6a.5.5 0 0 0 1 0V6z"/><path fill-rule="evenodd" d="M14.5 3a1 1 0 0 1-1 1H13v9a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V4h-.5a1 1 0 0 1-1-1V2a1 1 0 0 1 1-1H6a1 1 0 0 1 1-1h2a1 1 0 0 1 1 1h3.5a1 1 0 0 1 1 1v1zM4.118 4 4 4.059V13a1 1 0 0 0 1 1h6a1 1 0 0 0 1-1V4.059L11.882 4H4.118zM2.5 3V2h11v1h-11z"/></svg></button>`}
     </div>`).join('');
+
+  _ativarDragDropSchema();
+}
+
+/**
+ * Grava o schema reatribuindo `ordem` conforme a posição atual no array.
+ *
+ * CRÍTICO: o Apps Script grava a coluna `ordem` com `f.ordem ?? i+1` e a
+ * leitura ordena por ela. Sem reatribuir aqui, um campo movido manteria
+ * sua ordem antiga e voltaria à posição original no próximo carregamento.
+ * Toda alteração de schema (mover, adicionar, excluir) passa por aqui.
+ */
+function salvarSchemaOrdenado(schema) {
+  schema.forEach((f, i) => { f.ordem = i + 1; });
+  ls('schema_' + schemaEditKey, schema);
+  return schema;
+}
+
+/** Redesenha o modal de campos com o título correto da categoria. */
+function _rerenderSchemaModal(schema) {
+  const labelMap = { unidades: 'Unidades de Saúde', oss: 'Organizações Sociais' };
+  renderSchemaModal(schema, labelMap[schemaEditKey] || schemaEditKey);
+}
+
+/**
+ * Move um campo do schema uma posição para cima (-1) ou para baixo (+1).
+ * Campos protegidos também podem ser movidos — a ordem é apresentação,
+ * não afeta a obrigatoriedade nem a integridade dos dados.
+ */
+function moverCampoSchema(idx, dir) {
+  const schema = ls('schema_' + schemaEditKey) || [];
+  const novo = idx + dir;
+  if (novo < 0 || novo >= schema.length) return;
+  const tmp = schema[idx];
+  schema[idx] = schema[novo];
+  schema[novo] = tmp;
+  salvarSchemaOrdenado(schema);
+  _rerenderSchemaModal(schema);
+  showToast(`Campo movido ${dir < 0 ? 'para cima' : 'para baixo'}`);
+}
+
+/** Move o campo da posição `de` para a posição `para` (usado no drag & drop). */
+function reposicionarCampoSchema(de, para) {
+  const schema = ls('schema_' + schemaEditKey) || [];
+  if (de === para || de < 0 || para < 0 || de >= schema.length || para >= schema.length) return;
+  const [movido] = schema.splice(de, 1);
+  schema.splice(para, 0, movido);
+  salvarSchemaOrdenado(schema);
+  _rerenderSchemaModal(schema);
+  showToast(`Campo "${movido.label}" reposicionado`);
+}
+
+/** Ativa o arrastar-e-soltar das linhas de campo do modal de schema. */
+function _ativarDragDropSchema() {
+  let origem = null;
+  document.querySelectorAll('#schema-fields-list .schema-row').forEach(row => {
+    // A linha só se torna arrastável enquanto a alça ⠿ está pressionada.
+    // Sem isso, selecionar texto dentro dos inputs iniciaria o arrasto.
+    const alca = row.querySelector('.schema-drag-handle');
+    if (alca) {
+      alca.addEventListener('mousedown', () => { row.draggable = true; });
+      alca.addEventListener('mouseup',   () => { row.draggable = false; });
+    }
+    row.addEventListener('dragstart', e => {
+      origem = Number(row.dataset.idx);
+      row.classList.add('dragging');
+      e.dataTransfer.effectAllowed = 'move';
+      // Firefox exige algum dado para iniciar o arrasto
+      try { e.dataTransfer.setData('text/plain', String(origem)); } catch (_) {}
+    });
+    row.addEventListener('dragend', () => {
+      row.draggable = false;
+      row.classList.remove('dragging');
+      document.querySelectorAll('#schema-fields-list .schema-row.drag-over')
+        .forEach(r => r.classList.remove('drag-over'));
+    });
+    row.addEventListener('dragover', e => {
+      e.preventDefault();
+      e.dataTransfer.dropEffect = 'move';
+      if (Number(row.dataset.idx) !== origem) row.classList.add('drag-over');
+    });
+    row.addEventListener('dragleave', () => row.classList.remove('drag-over'));
+    row.addEventListener('drop', e => {
+      e.preventDefault();
+      e.stopPropagation();
+      row.classList.remove('drag-over');
+      const destino = Number(row.dataset.idx);
+      if (origem === null || origem === destino) return;
+      reposicionarCampoSchema(origem, destino);
+      origem = null;
+    });
+  });
 }
 
 function adicionarCampoSchema() {
@@ -504,21 +613,20 @@ function adicionarCampoSchema() {
   const schema = ls('schema_' + schemaEditKey) || [];
   if (schema.find(f => f.key === key)) { alert('Já existe um campo com este nome!'); return; }
   schema.push({ key, label, tipo, protegido: false });
-  ls('schema_' + schemaEditKey, schema);
+  salvarSchemaOrdenado(schema);
   document.getElementById('new-field-label').value = '';
-  const labelMap = { unidades: 'Unidades de Saúde', oss: 'Organizações Sociais' };
-  renderSchemaModal(schema, labelMap[schemaEditKey] || schemaEditKey);
+  _rerenderSchemaModal(schema);
   showToast('Campo "' + label + '" adicionado!');
 }
 
 function renomearCampoSchema(idx, newLabel) {
   const schema = ls('schema_' + schemaEditKey) || [];
-  if (schema[idx]) { schema[idx].label = newLabel; ls('schema_' + schemaEditKey, schema); }
+  if (schema[idx]) { schema[idx].label = newLabel; salvarSchemaOrdenado(schema); }
 }
 
 function editarTipoCampoSchema(idx, newTipo) {
   const schema = ls('schema_' + schemaEditKey) || [];
-  if (schema[idx] && !schema[idx].protegido) { schema[idx].tipo = newTipo; ls('schema_' + schemaEditKey, schema); }
+  if (schema[idx] && !schema[idx].protegido) { schema[idx].tipo = newTipo; salvarSchemaOrdenado(schema); }
 }
 
 function excluirCampoSchema(idx) {
@@ -526,9 +634,8 @@ function excluirCampoSchema(idx) {
   if (schema[idx]?.protegido) return;
   if (!confirm('Excluir o campo "' + schema[idx].label + '"?')) return;
   schema.splice(idx, 1);
-  ls('schema_' + schemaEditKey, schema);
-  const labelMap = { unidades: 'Unidades de Saúde', oss: 'Organizações Sociais' };
-  renderSchemaModal(schema, labelMap[schemaEditKey] || schemaEditKey);
+  salvarSchemaOrdenado(schema);
+  _rerenderSchemaModal(schema);
 }
 
 // ── Usuários ──────────────────────────────────────────────────

@@ -413,8 +413,8 @@ function renderListaCamposEtapa() {
     ).join('');
 
     return `
-      <div class="schema-field-row" style="flex-wrap:wrap">
-        <div class="schema-drag-handle" title="Posição ${i + 1}">⠿</div>
+      <div class="schema-field-row campo-etapa-row" draggable="false" data-idx="${i}" style="flex-wrap:wrap">
+        <div class="schema-drag-handle" title="Arraste para reordenar (posição ${i + 1})">⠿</div>
         <input type="text" value="${(campo.label || '').replace(/"/g, '&quot;')}"
                placeholder="Rótulo do campo (ex: Solicitado?)"
                oninput="atualizarCampoEtapa(${i}, 'label', this.value)"
@@ -440,6 +440,65 @@ function renderListaCamposEtapa() {
         </div>
       </div>`;
   }).join('');
+
+  _ativarDragDropCamposEtapa();
+}
+
+/**
+ * Move um campo da etapa da posição `de` para a posição `para`.
+ * Usado pelo arrastar-e-soltar; as setas ▲▼ usam moverCampoEtapa().
+ */
+function reposicionarCampoEtapa(de, para) {
+  if (de === para || de < 0 || para < 0) return;
+  if (de >= _camposEtapaEdit.length || para >= _camposEtapaEdit.length) return;
+  const [movido] = _camposEtapaEdit.splice(de, 1);
+  _camposEtapaEdit.splice(para, 0, movido);
+  renderListaCamposEtapa();
+}
+
+/**
+ * Ativa o arrastar-e-soltar das linhas de campo da etapa.
+ * O ⠿ já existia como indicação visual, mas sem comportamento —
+ * aqui ele passa a funcionar de fato.
+ */
+function _ativarDragDropCamposEtapa() {
+  let origem = null;
+  document.querySelectorAll('#etapa-campos-lista .campo-etapa-row').forEach(row => {
+    // A linha só se torna arrastável enquanto a alça ⠿ está pressionada.
+    // Sem isso, selecionar texto dentro dos inputs iniciaria o arrasto.
+    const alca = row.querySelector('.schema-drag-handle');
+    if (alca) {
+      alca.addEventListener('mousedown', () => { row.draggable = true; });
+      alca.addEventListener('mouseup',   () => { row.draggable = false; });
+    }
+    row.addEventListener('dragstart', e => {
+      origem = Number(row.dataset.idx);
+      row.classList.add('dragging');
+      e.dataTransfer.effectAllowed = 'move';
+      try { e.dataTransfer.setData('text/plain', String(origem)); } catch (_) {}
+    });
+    row.addEventListener('dragend', () => {
+      row.draggable = false;
+      row.classList.remove('dragging');
+      document.querySelectorAll('#etapa-campos-lista .campo-etapa-row.drag-over')
+        .forEach(r => r.classList.remove('drag-over'));
+    });
+    row.addEventListener('dragover', e => {
+      e.preventDefault();
+      e.dataTransfer.dropEffect = 'move';
+      if (Number(row.dataset.idx) !== origem) row.classList.add('drag-over');
+    });
+    row.addEventListener('dragleave', () => row.classList.remove('drag-over'));
+    row.addEventListener('drop', e => {
+      e.preventDefault();
+      e.stopPropagation();
+      row.classList.remove('drag-over');
+      const destino = Number(row.dataset.idx);
+      if (origem === null || origem === destino) return;
+      reposicionarCampoEtapa(origem, destino);
+      origem = null;
+    });
+  });
 }
 
 function adicionarLinhaCampoEtapa() {
