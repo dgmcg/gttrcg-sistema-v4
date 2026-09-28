@@ -28,7 +28,50 @@
   --radius: 6px;
   --radius2: 10px;
   --shadow: 0 1px 3px rgba(0,0,0,.4);
+  color-scheme: dark;
 }
+
+/* ── TEMA CLARO ──────────────────────────────────────────────
+   Redefine apenas as variáveis; todo o restante do CSS já as usa.
+   Aplicado por aplicarTema() via atributo data-tema no <html>.   */
+:root[data-tema="claro"] {
+  --bg:      #ffffff;
+  --bg1:     #f6f8fa;
+  --bg2:     #eef1f5;
+  --bg3:     #e2e7ec;
+  --border:  #d0d7de;
+  --border2: #b9c1ca;
+  --text:    #1f2328;
+  --text2:   #59636e;
+  --text3:   #7d8590;
+  --accent:  #0969da;
+  --accent2: #0550ae;
+  --green:   #1a7f37;
+  --green2:  #1f883d;
+  --yellow:  #9a6700;
+  --yellow2: #bc4c00;
+  --red:     #cf222e;
+  --red2:    #d1242f;
+  --purple:  #8250df;
+  --teal:    #1a7f37;
+  --shadow:  0 1px 3px rgba(31,35,40,.12);
+  color-scheme: light;
+}
+
+/* Alternador de tema (sol / lua) na topbar */
+.tema-switch {
+  display: flex; gap: 2px; align-items: center;
+  background: var(--bg2); border: 1px solid var(--border);
+  border-radius: var(--radius); padding: 2px; margin-right: 10px; flex-shrink: 0;
+}
+.tema-btn {
+  display: flex; align-items: center; justify-content: center;
+  width: 28px; height: 24px; padding: 0;
+  background: none; border: none; border-radius: 4px;
+  color: var(--text3); cursor: pointer; transition: background .15s, color .15s;
+}
+.tema-btn:hover { color: var(--text2); background: var(--bg3); }
+.tema-btn.ativo { background: var(--bg); color: var(--accent2); box-shadow: var(--shadow); }
 
 * { box-sizing: border-box; margin: 0; padding: 0; }
 body { font-family: var(--font); background: var(--bg); color: var(--text); min-height: 100vh; font-size: 14px; }
@@ -74,7 +117,7 @@ input[type="date"] { color-scheme: dark; }
 .badge.blue   { background: rgba(31,111,235,.15); color: var(--accent2); border: 1px solid rgba(31,111,235,.3); }
 .badge.purple { background: rgba(137,87,229,.15); color: var(--purple); border: 1px solid rgba(137,87,229,.3); }
 .badge.gray   { background: var(--bg3); color: var(--text2); border: 1px solid var(--border); }
-.badge.teal   { background: rgba(46,160,67,.15);  color: #3fb950; border: 1px solid rgba(46,160,67,.3); }
+.badge.teal   { background: rgba(46,160,67,.15);  color: var(--green); border: 1px solid rgba(46,160,67,.3); }
 
 /* LAYOUT */
 #app { display: flex; flex-direction: column; min-height: 100vh; }
@@ -313,12 +356,15 @@ tbody td { padding: 10px 12px; vertical-align: middle; color: var(--text); }
 
 /* Setas ▲▼ de reordenação */
 .btn-ordem {
-  background: none; border: none; cursor: pointer;
-  color: var(--text3); font-size: 9px; line-height: 1;
-  padding: 1px 3px; border-radius: 2px; transition: color .15s, background .15s;
+  display: flex; align-items: center; justify-content: center;
+  width: 22px; height: 18px;
+  background: var(--bg2); border: 1px solid var(--border); cursor: pointer;
+  color: var(--text2); font-size: 9px; line-height: 1;
+  padding: 0; border-radius: 3px; transition: color .15s, background .15s, border-color .15s;
 }
-.btn-ordem:hover:not(:disabled) { color: var(--accent2); background: var(--bg3); }
-.btn-ordem:disabled { opacity: .25; cursor: default; }
+.btn-ordem:hover:not(:disabled) { color: #fff; background: var(--accent); border-color: var(--accent); }
+.btn-ordem:active:not(:disabled) { background: var(--accent2); border-color: var(--accent2); }
+.btn-ordem:disabled { opacity: .3; cursor: default; }
 
 .section-divider {
   font-size: 11px; color: var(--text3); text-transform: uppercase; letter-spacing: .6px;
@@ -662,3 +708,29 @@ tbody td { padding: 10px 12px; vertical-align: middle; color: var(--text); }
   font-weight: 700;
   letter-spacing: -.3px;
 }
+
+/* ── Campo Lista Fixa de múltipla escolha ──────────────────── */
+.multi-select {
+  background: var(--bg); border: 1px solid var(--border);
+  border-radius: var(--radius); font-size: 12px;
+}
+.multi-select > summary {
+  display: flex; align-items: center; justify-content: space-between; gap: 6px;
+  padding: 6px 8px; cursor: pointer; list-style: none; user-select: none;
+  color: var(--text); min-height: 30px;
+}
+.multi-select > summary::-webkit-details-marker { display: none; }
+.multi-select > summary:hover { background: var(--bg2); border-radius: var(--radius); }
+.multi-select[open] > summary { border-bottom: 1px solid var(--border); }
+.multi-opcoes {
+  display: flex; flex-direction: column;
+  max-height: 180px; overflow-y: auto; padding: 4px;
+}
+.multi-opcao {
+  display: flex; align-items: center; gap: 7px;
+  padding: 5px 7px; border-radius: var(--radius); cursor: pointer;
+  font-size: 12px; color: var(--text2);
+}
+.multi-opcao:hover { background: var(--bg2); color: var(--text); }
+.multi-opcao input { width: auto; margin: 0; cursor: pointer; flex-shrink: 0; }
+.multi-opcao input:disabled { cursor: default; }
