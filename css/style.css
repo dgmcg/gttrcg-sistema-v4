@@ -295,8 +295,30 @@ tbody td { padding: 10px 12px; vertical-align: middle; color: var(--text); }
 .schema-field-row input { font-size: 12px; padding: 6px 8px; }
 .schema-drag-handle {
   cursor: grab; color: var(--text3); font-size: 14px;
-  flex-shrink: 0; user-select: none; padding: 0 2px;
+  flex-shrink: 0; user-select: none; padding: 2px 4px;
+  border-radius: 3px; transition: background .15s, color .15s;
 }
+.schema-drag-handle:hover { background: var(--bg3); color: var(--text2); }
+.schema-drag-handle:active { cursor: grabbing; }
+
+/* Reordenação de campos (modal Campos e editor de campos da etapa) */
+.schema-row.dragging,
+.campo-etapa-row.dragging { opacity: .4; }
+
+.schema-row.drag-over,
+.campo-etapa-row.drag-over {
+  border-color: var(--accent2);
+  box-shadow: 0 -2px 0 0 var(--accent2) inset;
+}
+
+/* Setas ▲▼ de reordenação */
+.btn-ordem {
+  background: none; border: none; cursor: pointer;
+  color: var(--text3); font-size: 9px; line-height: 1;
+  padding: 1px 3px; border-radius: 2px; transition: color .15s, background .15s;
+}
+.btn-ordem:hover:not(:disabled) { color: var(--accent2); background: var(--bg3); }
+.btn-ordem:disabled { opacity: .25; cursor: default; }
 
 .section-divider {
   font-size: 11px; color: var(--text3); text-transform: uppercase; letter-spacing: .6px;
