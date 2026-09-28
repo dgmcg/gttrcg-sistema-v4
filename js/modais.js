@@ -2,41 +2,90 @@
 // modais.js — Gestão de Modais e Formulários
 // ============================================================
 
-// ── Helpers gerais ────────────────────────────────────────────
-function openModal(id) { document.getElementById(id)?.classList.add('open'); }
+// ── Rastreio de alterações não salvas (todos os formulários) ───
+// Ao abrir um modal rastreado, guardamos um "retrato" do estado dos
+// seus campos. Ao fechar, comparamos com o estado atual: se mudou algo
+// que ainda não foi salvo, perguntamos antes de descartar.
+//
+// Para incluir um novo formulário na proteção, basta registrá-lo em
+// MODAIS_RASTREADOS — nenhuma outra alteração é necessária.
+const MODAIS_RASTREADOS = {
+  'modal-detalhe': {
+    captor: () => _capturarEstadoCamposDetalhe(),
+    aviso: 'Você tem alterações não salvas neste processo.\n\nDeseja realmente sair sem salvar o acompanhamento?',
+  },
+  'modal-processo': {
+    captor: () => _capturarEstadoGenerico('modal-processo'),
+    aviso: 'Você tem alterações não salvas neste processo.\n\nDeseja realmente sair sem salvar?',
+  },
+  'modal-etapa-fluxo': {
+    captor: () => _capturarEstadoGenerico('modal-etapa-fluxo'),
+    aviso: 'Você tem alterações não salvas nesta etapa.\n\nDeseja realmente sair sem salvar?',
+  },
+  'modal-dado-fixo': {
+    captor: () => _capturarEstadoGenerico('modal-dado-fixo'),
+    aviso: 'Você tem alterações não salvas neste cadastro.\n\nDeseja realmente sair sem salvar?',
+  },
+  'modal-usuario': {
+    captor: () => _capturarEstadoGenerico('modal-usuario'),
+    aviso: 'Você tem alterações não salvas neste usuário.\n\nDeseja realmente sair sem salvar?',
+  },
+};
+
+// Retratos por modal: { 'modal-processo': {...}, ... }
+const _snapshotsModais = {};
 
 /**
- * closeModal(id) — fecha o modal, exceto quando se trata do
- * modal-detalhe com alterações pendentes: nesse caso, pergunta
- * antes de descartar (ver _confirmarFechamentoDetalhe).
+ * Captor padrão: varre todos os campos de formulário dentro do modal.
+ * Botões, arquivos e elementos marcados com data-sem-rastreio ficam fora.
+ * A chave prioriza o id; na falta dele, usa a posição no DOM — o que
+ * também faz com que adicionar, remover ou reordenar campos (por
+ * exemplo na lista de campos de uma etapa) conte como alteração.
  */
-function closeModal(id) {
-  if (id === 'modal-detalhe' && _detalheTemAlteracoes()) {
-    _confirmarFechamentoDetalhe();
-    return;
+function _capturarEstadoGenerico(modalId) {
+  const estado = {};
+  const modal = document.getElementById(modalId);
+  if (!modal) return estado;
+  const seletor = 'input:not([type=button]):not([type=submit]):not([type=reset]):not([type=file]), select, textarea';
+  modal.querySelectorAll(seletor).forEach((el, i) => {
+    if (el.closest('[data-sem-rastreio]')) return;
+    const key = el.id || el.name || `pos_${i}`;
+    estado[key] = (el.type === 'checkbox' || el.type === 'radio') ? String(el.checked) : el.value;
+  });
+  return estado;
+}
+
+/** Tira o retrato inicial de um modal rastreado. */
+function _iniciarRastreioModal(modalId) {
+  const cfg = MODAIS_RASTREADOS[modalId];
+  if (!cfg) return;
+  _snapshotsModais[modalId] = cfg.captor();
+}
+
+/** Descarta o retrato — o modal deixa de ter alterações pendentes. */
+function _resetRastreioModal(modalId) {
+  delete _snapshotsModais[modalId];
+}
+
+/** true se o modal está rastreado e algum campo mudou desde a abertura. */
+function modalTemAlteracoes(modalId) {
+  const cfg = MODAIS_RASTREADOS[modalId];
+  const inicial = _snapshotsModais[modalId];
+  if (!cfg || !inicial) return false;
+  const atual = cfg.captor();
+  const chaves = new Set([...Object.keys(inicial), ...Object.keys(atual)]);
+  for (const k of chaves) {
+    if ((inicial[k] ?? '') !== (atual[k] ?? '')) return true;
   }
-  document.getElementById(id)?.classList.remove('open');
+  return false;
 }
 
-/** Força o fechamento sem perguntar — usado após salvar com sucesso. */
-function closeModalForcado(id) {
-  document.getElementById(id)?.classList.remove('open');
-  if (id === 'modal-detalhe') _resetRastreioAlteracoes();
-}
-
-// ── Rastreio de alterações não salvas no modal de acompanhamento ──
-// Snapshot do HTML de detalhe-body no momento em que o modal é aberto.
-// Comparado com o estado atual dos campos para saber se algo mudou.
-let _detalheSnapshotInicial = null;
-
-function _iniciarRastreioAlteracoes() {
-  _detalheSnapshotInicial = _capturarEstadoCamposDetalhe();
-}
-
-function _resetRastreioAlteracoes() {
-  _detalheSnapshotInicial = null;
-}
-
+/**
+ * Captor do modal de acompanhamento. Diferente do genérico: olha apenas
+ * os campos das etapas (data-etapa) mais status/fase, ignorando de
+ * propósito os checkboxes Iniciada/Concluída/N-A, que já gravam sozinhos
+ * e apareceriam como alteração pendente sem serem.
+ */
 function _capturarEstadoCamposDetalhe() {
   const estado = {};
   document.querySelectorAll('#detalhe-body [data-etapa]').forEach(el => {
@@ -51,29 +100,49 @@ function _capturarEstadoCamposDetalhe() {
   return estado;
 }
 
-function _detalheTemAlteracoes() {
-  if (!_detalheSnapshotInicial) return false;
-  const atual = _capturarEstadoCamposDetalhe();
-  const chaves = new Set([...Object.keys(_detalheSnapshotInicial), ...Object.keys(atual)]);
-  for (const k of chaves) {
-    if ((_detalheSnapshotInicial[k] ?? '') !== (atual[k] ?? '')) return true;
+// Nomes antigos mantidos para não quebrar as chamadas já existentes
+function _iniciarRastreioAlteracoes() { _iniciarRastreioModal('modal-detalhe'); }
+function _resetRastreioAlteracoes()   { _resetRastreioModal('modal-detalhe'); }
+function _detalheTemAlteracoes()      { return modalTemAlteracoes('modal-detalhe'); }
+
+// ── Abrir / fechar ────────────────────────────────────────────
+/**
+ * openModal(id) — abre o modal e, se ele for rastreado, tira o retrato
+ * inicial dos campos. O pequeno atraso garante que rotinas que populam
+ * selects logo após a abertura já tenham rodado, evitando falso positivo.
+ */
+function openModal(id) {
+  document.getElementById(id)?.classList.add('open');
+  if (MODAIS_RASTREADOS[id]) {
+    _resetRastreioModal(id);
+    setTimeout(() => _iniciarRastreioModal(id), 80);
   }
-  return false;
 }
 
-function _confirmarFechamentoDetalhe() {
-  const confirmou = confirm('Você tem alterações não salvas neste processo.\n\nDeseja realmente sair sem salvar o acompanhamento?');
-  if (confirmou) {
-    document.getElementById('modal-detalhe')?.classList.remove('open');
-    _resetRastreioAlteracoes();
+/**
+ * closeModal(id) — fecha o modal, exceto quando há alterações pendentes
+ * em um formulário rastreado: nesse caso, pergunta antes de descartar.
+ */
+function closeModal(id) {
+  if (modalTemAlteracoes(id)) {
+    if (!confirm(MODAIS_RASTREADOS[id].aviso)) return;
   }
+  closeModalForcado(id);
+}
+
+/** Força o fechamento sem perguntar — usado após salvar com sucesso. */
+function closeModalForcado(id) {
+  document.getElementById(id)?.classList.remove('open');
+  _resetRastreioModal(id);
 }
 
 // Aviso nativo do navegador ao tentar fechar a aba/recarregar com
-// alterações pendentes no modal de acompanhamento aberto.
+// alterações pendentes em qualquer formulário rastreado aberto.
 window.addEventListener('beforeunload', e => {
-  const modalAberto = document.getElementById('modal-detalhe')?.classList.contains('open');
-  if (modalAberto && _detalheTemAlteracoes()) {
+  const pendente = Object.keys(MODAIS_RASTREADOS).some(id =>
+    document.getElementById(id)?.classList.contains('open') && modalTemAlteracoes(id)
+  );
+  if (pendente) {
     e.preventDefault();
     e.returnValue = '';
   }
@@ -311,7 +380,7 @@ function salvarProcesso() {
   };
   if (idx >= 0) processos[idx] = obj; else processos.push(obj);
   ls('processos', processos);
-  closeModal('modal-processo');
+  closeModalForcado('modal-processo');
   renderMonitoramento();
   renderDashboard();
   updateSidebarCounts();
@@ -338,7 +407,8 @@ const TIPOS_CAMPO_ETAPA = [
   { value: 'boolean',   label: 'Sim / Não / N/A' },
   { value: 'date',      label: 'Data' },
   { value: 'moeda',     label: 'Valor (R$)' },
-  { value: 'listafixo', label: 'Lista Fixa (dados fixos)' },
+  { value: 'listafixo',  label: 'Lista Fixa (dados fixos)' },
+  { value: 'listamulti', label: 'Lista Fixa (múltipla escolha)' },
   { value: 'pdf',       label: 'Anexo de Documento' },
 ];
 
@@ -404,7 +474,7 @@ function renderListaCamposEtapa() {
   }
 
   container.innerHTML = _camposEtapaEdit.map((campo, i) => {
-    const isLista = campo.tipo === 'listafixo';
+    const isLista = campo.tipo === 'listafixo' || campo.tipo === 'listamulti';
     const listaOpts = LISTAS_FIXAS_DISPONIVEIS.map(l =>
       `<option value="${l.key}" ${campo.listaFonte === l.key ? 'selected' : ''}>${l.label}</option>`
     ).join('');
@@ -516,7 +586,7 @@ function atualizarCampoEtapa(idx, prop, val) {
   _camposEtapaEdit[idx][prop] = val;
   // Ao trocar o tipo, re-renderiza para mostrar/esconder o seletor de lista fonte
   if (prop === 'tipo') {
-    if (val !== 'listafixo') delete _camposEtapaEdit[idx].listaFonte;
+    if (val !== 'listafixo' && val !== 'listamulti') delete _camposEtapaEdit[idx].listaFonte;
     renderListaCamposEtapa();
   }
 }
@@ -593,7 +663,7 @@ async function salvarUsuario() {
 
   if (idx >= 0) users[idx] = obj; else users.push(obj);
   ls('usuarios', users);
-  closeModal('modal-usuario');
+  closeModalForcado('modal-usuario');
   renderUsuarios();
   showToast('Usuário salvo!');
 }

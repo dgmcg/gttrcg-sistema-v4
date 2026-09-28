@@ -281,6 +281,9 @@ function buildDadoFixoForm(key, fields, item) {
       input = `<textarea id="dado-field-${i}" data-fieldkey="${s.key}" class="w-full" rows="2" placeholder="${s.label}">${val}</textarea>`;
     } else if (s.tipo === 'moeda') {
       input = `<div style="position:relative"><span style="position:absolute;left:10px;top:50%;transform:translateY(-50%);color:var(--text3);font-size:13px;pointer-events:none">R$</span><input type="number" id="dado-field-${i}" data-fieldkey="${s.key}" class="w-full" step="0.01" min="0" style="padding-left:30px" value="${val}" placeholder="0,00"></div>`;
+    } else if (s.tipo === 'listamulti' && s.listaFonte) {
+      input = renderCampoMultiSelect(`dado-field-${i}`, s.listaFonte, val,
+                                     `data-fieldkey="${s.key}"`, false);
     } else if (s.tipo === 'listafixo' && s.listaFonte) {
       const listaFonte = ls(s.listaFonte) || [];
       const opts = listaFonte.map(it => {
@@ -367,7 +370,7 @@ function salvarDadoFixo() {
     }
   }
   ls(key, data);
-  closeModal('modal-dado-fixo');
+  closeModalForcado('modal-dado-fixo');
   renderDadosFixos();
   showToast('Item salvo!');
 }
@@ -384,7 +387,7 @@ function excluirDadoFixo() {
     data = data.filter(x => x.id !== id);
   }
   ls(key, data);
-  closeModal('modal-dado-fixo');
+  closeModalForcado('modal-dado-fixo');
   renderDadosFixos();
   showToast('Item excluído!');
 }
@@ -471,11 +474,15 @@ function renderSchemaModal(schema, title) {
           <div style="display:grid;grid-template-columns:1fr 1fr auto;gap:8px;align-items:end">
             <div class="field-group"><label>Nome do Campo</label><input type="text" id="new-field-label" placeholder="Ex: Representante Legal" class="w-full"></div>
             <div class="field-group"><label>Tipo</label>
-              <select id="new-field-tipo" class="w-full">
-                <option value="text">Texto</option><option value="date">Data</option><option value="number">Número</option><option value="textarea">Texto longo</option><option value="moeda">Valor (R$)</option><option value="listafixo">Lista Fixa</option>
+              <select id="new-field-tipo" class="w-full" onchange="_toggleNovaListaFonte()">
+                <option value="text">Texto</option><option value="date">Data</option><option value="number">Número</option><option value="textarea">Texto longo</option><option value="moeda">Valor (R$)</option><option value="listafixo">Lista Fixa</option><option value="listamulti">Lista Fixa (múltipla escolha)</option>
               </select>
             </div>
             <button class="btn primary" onclick="adicionarCampoSchema()" style="align-self:end">+ Adicionar</button>
+          </div>
+          <div class="field-group" id="new-field-lista-wrap" style="display:none;margin-top:10px">
+            <label>Lista de origem</label>
+            <select id="new-field-lista" class="w-full"></select>
           </div>
         </div>
       </div>
@@ -495,13 +502,21 @@ function renderSchemaModal(schema, title) {
         <div style="font-size:13px;font-weight:500">${f.label} ${f.protegido ? '🔒' : ''}</div>
         <div style="font-size:10px;color:var(--text3);font-family:var(--mono)">${f.key} · ${f.tipo}</div>
       </div>
-      <select onchange="editarTipoCampoSchema(${i},this.value)" style="font-size:11px;padding:3px 6px;width:100px">
+      <select onchange="editarTipoCampoSchema(${i},this.value)" style="font-size:11px;padding:3px 6px;width:118px">
         <option value="text" ${f.tipo === 'text' ? 'selected' : ''}>Texto</option>
         <option value="date" ${f.tipo === 'date' ? 'selected' : ''}>Data</option>
         <option value="number" ${f.tipo === 'number' ? 'selected' : ''}>Número</option>
+        <option value="textarea" ${f.tipo === 'textarea' ? 'selected' : ''}>Texto longo</option>
         <option value="moeda" ${f.tipo === 'moeda' ? 'selected' : ''}>Moeda</option>
         <option value="listafixo" ${f.tipo === 'listafixo' ? 'selected' : ''}>Lista Fixa</option>
+        <option value="listamulti" ${f.tipo === 'listamulti' ? 'selected' : ''}>Lista múltipla</option>
       </select>
+      ${(f.tipo === 'listafixo' || f.tipo === 'listamulti')
+        ? `<select onchange="definirListaFonteSchema(${i},this.value)" title="Lista de origem" style="font-size:11px;padding:3px 6px;width:130px">
+             <option value="">— lista —</option>
+             ${_opcoesListaFonte(f.listaFonte)}
+           </select>`
+        : ''}
       <input type="text" value="${f.label}" onchange="renomearCampoSchema(${i},this.value)" style="width:160px;font-size:12px;padding:4px 8px" ${f.protegido ? 'readonly' : ''}>
       <div style="display:flex;flex-direction:column;gap:1px">
         <button type="button" class="btn-ordem" title="Mover para cima"
@@ -523,6 +538,40 @@ function renderSchemaModal(schema, title) {
  * sua ordem antiga e voltaria à posição original no próximo carregamento.
  * Toda alteração de schema (mover, adicionar, excluir) passa por aqui.
  */
+/** Opções de lista de origem, reutilizando o catálogo do editor de etapas. */
+function _opcoesListaFonte(atual) {
+  const listas = (typeof LISTAS_FIXAS_DISPONIVEIS !== 'undefined') ? LISTAS_FIXAS_DISPONIVEIS : [
+    { key: 'setores', label: 'Setores / Órgãos' }, { key: 'pessoas', label: 'Pessoas' },
+    { key: 'unidades', label: 'Unidades de Saúde' }, { key: 'oss', label: 'Organizações Sociais (OSS)' },
+    { key: 'statusProcesso', label: 'Status de Processo' }, { key: 'fases', label: 'Fases do Processo' },
+    { key: 'tiposProcesso', label: 'Tipos de Processo' }, { key: 'statusContrato', label: 'Status do Contrato' },
+    { key: 'tiposUnidade', label: 'Tipos de Unidade' },
+  ];
+  return listas.map(l => `<option value="${l.key}" ${l.key === atual ? 'selected' : ''}>${l.label}</option>`).join('');
+}
+
+/** Mostra/esconde o seletor de lista no formulário de novo campo. */
+function _toggleNovaListaFonte() {
+  const tipo = document.getElementById('new-field-tipo')?.value;
+  const wrap = document.getElementById('new-field-lista-wrap');
+  const sel  = document.getElementById('new-field-lista');
+  if (!wrap || !sel) return;
+  const ehLista = tipo === 'listafixo' || tipo === 'listamulti';
+  wrap.style.display = ehLista ? '' : 'none';
+  if (ehLista && !sel.options.length) {
+    sel.innerHTML = '<option value="">— Selecionar lista —</option>' + _opcoesListaFonte('');
+  }
+}
+
+/** Define de qual lista um campo já existente busca suas opções. */
+function definirListaFonteSchema(idx, valor) {
+  const schema = ls('schema_' + schemaEditKey) || [];
+  if (!schema[idx]) return;
+  if (valor) schema[idx].listaFonte = valor;
+  else delete schema[idx].listaFonte;
+  salvarSchemaOrdenado(schema);
+}
+
 function salvarSchemaOrdenado(schema) {
   schema.forEach((f, i) => { f.ordem = i + 1; });
   ls('schema_' + schemaEditKey, schema);
@@ -612,7 +661,13 @@ function adicionarCampoSchema() {
   const key = label.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/[^a-z0-9]+/g, '_').replace(/^_|_$/g, '');
   const schema = ls('schema_' + schemaEditKey) || [];
   if (schema.find(f => f.key === key)) { alert('Já existe um campo com este nome!'); return; }
-  schema.push({ key, label, tipo, protegido: false });
+  const campo = { key, label, tipo, protegido: false };
+  if (tipo === 'listafixo' || tipo === 'listamulti') {
+    const fonte = document.getElementById('new-field-lista')?.value || '';
+    if (!fonte) { alert('Selecione de qual lista este campo vai buscar as opções.'); return; }
+    campo.listaFonte = fonte;
+  }
+  schema.push(campo);
   salvarSchemaOrdenado(schema);
   document.getElementById('new-field-label').value = '';
   _rerenderSchemaModal(schema);
@@ -626,7 +681,13 @@ function renomearCampoSchema(idx, newLabel) {
 
 function editarTipoCampoSchema(idx, newTipo) {
   const schema = ls('schema_' + schemaEditKey) || [];
-  if (schema[idx] && !schema[idx].protegido) { schema[idx].tipo = newTipo; salvarSchemaOrdenado(schema); }
+  if (schema[idx] && !schema[idx].protegido) {
+    schema[idx].tipo = newTipo;
+    // Sair de um tipo de lista descarta a origem; entrar exige escolher uma
+    if (newTipo !== 'listafixo' && newTipo !== 'listamulti') delete schema[idx].listaFonte;
+    salvarSchemaOrdenado(schema);
+    _rerenderSchemaModal(schema);   // revela/esconde o seletor de lista
+  }
 }
 
 function excluirCampoSchema(idx) {

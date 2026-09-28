@@ -247,7 +247,7 @@ async function salvarUsuario() {
   else          users.push(obj);
 
   ls('usuarios', users);
-  closeModal('modal-usuario');
+  closeModalForcado('modal-usuario');
   renderUsuarios();
   showToast('Usuário salvo!');
 }

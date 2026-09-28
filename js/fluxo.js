@@ -375,7 +375,7 @@ function salvarEtapaFluxo() {
     .filter(c => c.label && c.label.trim())
     .map(c => {
       const limpo = { tipo: c.tipo || 'text', label: c.label.trim() };
-      if (c.tipo === 'listafixo' && c.listaFonte) limpo.listaFonte = c.listaFonte;
+      if ((c.tipo === 'listafixo' || c.tipo === 'listamulti') && c.listaFonte) limpo.listaFonte = c.listaFonte;
       return limpo;
     });
 
@@ -395,7 +395,7 @@ function salvarEtapaFluxo() {
   etapas = inserirEtapaComReordenacao(etapas, obj);
 
   ls('etapasFluxo', etapas);
-  closeModal('modal-etapa-fluxo');
+  closeModalForcado('modal-etapa-fluxo');
   renderFluxo();
   showToast('Etapa salva! Ordem das demais etapas ajustada automaticamente.');
 }
@@ -406,7 +406,7 @@ function excluirEtapa() {
   let etapas = ls('etapasFluxo') || [];
   etapas = removerEtapaComReordenacao(etapas, id);
   ls('etapasFluxo', etapas);
-  closeModal('modal-etapa-fluxo');
+  closeModalForcado('modal-etapa-fluxo');
   renderFluxo();
   showToast('Etapa excluída e ordem ajustada!');
 }
@@ -540,6 +540,11 @@ function openDetalhe(id) {
               <option value="">—</option>
               ${itens.map(it => `<option value="${it.value}"${val === it.value ? ' selected' : ''}>${it.label}</option>`).join('')}
             </select></div>`;
+        } else if (campo.tipo === 'listamulti' && campo.listaFonte) {
+          html += `<div class="etapa-field" style="grid-column:1/-1"><label>${campo.label}</label>
+            ${renderCampoMultiSelect(fid, campo.listaFonte, val,
+              `data-etapa="${e.id}" data-campo="${campo.label.replace(/"/g, '&quot;')}"`, (!isInit || isNA))}
+            </div>`;
         } else if (campo.tipo === 'moeda') {
           html += `<div class="etapa-field"><label>${campo.label}</label><input type="number" step="0.01" id="${fid}" data-etapa="${e.id}" data-campo="${campo.label}" value="${val}" placeholder="0,00" ${dis}></div>`;
         } else if (campo.tipo === 'pdf') {
@@ -594,10 +599,10 @@ function openDetalhe(id) {
     if (sel && ac._responsavel) sel.value = ac._responsavel;
   });
 
+  // O retrato dos campos (rastreio de alterações não salvas) é tirado pelo
+  // próprio openModal, depois de tudo renderizado e preenchido — ver
+  // MODAIS_RASTREADOS em modais.js.
   openModal('modal-detalhe');
-  // Inicia o rastreio de alterações DEPOIS de tudo renderizado e preenchido,
-  // para que o snapshot reflita o estado real salvo (não vazio).
-  setTimeout(_iniciarRastreioAlteracoes, 50);
 }
 
 // ── Linha do tempo ────────────────────────────────────────────

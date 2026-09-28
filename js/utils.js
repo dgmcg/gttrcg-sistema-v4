@@ -134,7 +134,8 @@ function closeModal(id) {
 }
 
 function closeAllModals() {
-  document.querySelectorAll('.modal-overlay.open').forEach(m => m.classList.remove('open'));
+  // Passa por closeModal para respeitar o aviso de alterações não salvas
+  document.querySelectorAll('.modal-overlay.open').forEach(m => closeModal(m.id));
 }
 
 /* ── Setup de eventos globais dos modais ── */
@@ -253,4 +254,140 @@ function ossComTooltip(sigla, estilo) {
   return nome
     ? `<span style="${style};border-bottom:1px dotted var(--text3);cursor:help" title="${nome.replace(/"/g,'&quot;')}">${sigla}</span>`
     : `<span style="${style}">${sigla}</span>`;
+}
+
+// ── TEMA DE VISUALIZAÇÃO (escuro / claro) ─────────────────────
+/**
+ * Aplica o tema e persiste a escolha.
+ *
+ * A preferência é de INTERFACE, não de negócio: fica no navegador
+ * (localStorage), não no Google Sheets. Padrão: escuro.
+ *
+ * O CSS define as cores em variáveis sob :root e :root[data-tema="claro"],
+ * então trocar o atributo troca o sistema inteiro de uma vez.
+ */
+function aplicarTema(tema) {
+  const claro = tema === 'claro';
+  if (claro) document.documentElement.setAttribute('data-tema', 'claro');
+  else       document.documentElement.removeAttribute('data-tema');
+
+  try { localStorage.setItem('gttrcg_tema', claro ? 'claro' : 'escuro'); } catch (e) {}
+
+  // Marca visualmente o botão ativo
+  const btnE = document.getElementById('btn-tema-escuro');
+  const btnC = document.getElementById('btn-tema-claro');
+  if (btnE) btnE.classList.toggle('ativo', !claro);
+  if (btnC) btnC.classList.toggle('ativo', claro);
+
+  // Redesenha os gráficos, que são pintados em canvas e não acompanham CSS
+  if (typeof Chart !== 'undefined' && typeof renderCtGraficos === 'function') {
+    const abaGraf = document.getElementById('tab-ct-graficos');
+    if (abaGraf?.classList.contains('active') && typeof calcContratosData === 'function') {
+      try { renderCtGraficos(applyCtFilters(calcContratosData())); } catch (e) {}
+    }
+  }
+}
+
+/** Lê o tema salvo; devolve 'escuro' quando nada foi escolhido ainda. */
+function getTemaAtual() {
+  try { return localStorage.getItem('gttrcg_tema') === 'claro' ? 'claro' : 'escuro'; }
+  catch (e) { return 'escuro'; }
+}
+
+// Sincroniza o estado dos botões assim que o DOM estiver pronto
+// (o tema em si já foi aplicado pelo script inline do <head>)
+document.addEventListener('DOMContentLoaded', () => aplicarTema(getTemaAtual()));
+
+// ── CAMPO LISTA FIXA DE MÚLTIPLA ESCOLHA ──────────────────────
+// Armazenamento: texto separado por "; " (ex.: "SEAS; DGLCA").
+// Escolhido em vez de JSON para permanecer legível na planilha,
+// pesquisável pela busca do sistema e utilizável em fórmulas do Sheets.
+const MULTI_SEP = '; ';
+
+/** Converte o valor gravado em array de opções selecionadas. */
+function multiParaArray(valor) {
+  if (!valor) return [];
+  if (Array.isArray(valor)) return valor.filter(Boolean);
+  return String(valor).split(';').map(v => v.trim()).filter(Boolean);
+}
+
+/** Converte um array de opções no texto a ser gravado. */
+function multiParaTexto(arr) {
+  return (arr || []).filter(Boolean).join(MULTI_SEP);
+}
+
+/**
+ * Monta o widget de múltipla escolha.
+ *
+ * O valor consolidado vive num <input type="hidden"> que recebe os
+ * mesmos atributos de dados do campo (data-etapa/data-campo ou
+ * data-fieldkey). Assim as rotinas de salvamento já existentes
+ * continuam funcionando sem qualquer alteração.
+ *
+ * @param {string} fid       id do input oculto
+ * @param {string} listaFonte  coleção de onde vêm as opções
+ * @param {string} valorAtual  texto gravado ("A; B")
+ * @param {string} attrsHidden atributos extras do input oculto
+ * @param {boolean} desabilitado
+ */
+function renderCampoMultiSelect(fid, listaFonte, valorAtual, attrsHidden, desabilitado) {
+  const itens = typeof getListaItens === 'function' ? getListaItens(listaFonte) : [];
+  const sel = multiParaArray(valorAtual);
+  const dis = desabilitado ? 'disabled' : '';
+
+  if (!itens.length) {
+    return `<input type="hidden" id="${fid}" ${attrsHidden || ''} value="${(valorAtual || '').replace(/"/g, '&quot;')}">
+      <div style="font-size:11px;color:var(--text3);padding:6px 8px;background:var(--bg2);border:1px dashed var(--border2);border-radius:var(--radius)">
+        Nenhum item cadastrado na lista "${listaFonte}".
+      </div>`;
+  }
+
+  const opcoes = itens.map(it => {
+    const v = String(it.value);
+    const marcado = sel.includes(v) ? 'checked' : '';
+    return `<label class="multi-opcao">
+      <input type="checkbox" value="${v.replace(/"/g, '&quot;')}" data-multi-alvo="${fid}" ${marcado} ${dis}
+             onchange="atualizarMultiSelect(this)">
+      <span>${it.label}</span>
+    </label>`;
+  }).join('');
+
+  return `<input type="hidden" id="${fid}" ${attrsHidden || ''} value="${multiParaTexto(sel).replace(/"/g, '&quot;')}">
+    <details class="multi-select" id="${fid}_box">
+      <summary>
+        <span id="${fid}_resumo">${_multiResumoTexto(sel)}</span>
+        <svg viewBox="0 0 16 16" fill="currentColor" width="10" height="10" style="flex-shrink:0;opacity:.6">
+          <path d="M1.646 4.646a.5.5 0 0 1 .708 0L8 10.293l5.646-5.647a.5.5 0 0 1 .708.708l-6 6a.5.5 0 0 1-.708 0l-6-6a.5.5 0 0 1 0-.708z"/>
+        </svg>
+      </summary>
+      <div class="multi-opcoes">${opcoes}</div>
+    </details>`;
+}
+
+/** Texto-resumo exibido no cabeçalho do widget. */
+function _multiResumoTexto(sel) {
+  if (!sel.length) return '<span style="color:var(--text3)">Nenhum selecionado</span>';
+  if (sel.length <= 2) return sel.join(', ');
+  return `${sel.length} selecionados`;
+}
+
+/**
+ * Chamado a cada marcação/desmarcação: consolida os valores no input
+ * oculto e atualiza o resumo. É o único ponto que escreve o valor.
+ */
+function atualizarMultiSelect(cb) {
+  const fid = cb.dataset.multiAlvo;
+  if (!fid) return;
+  const marcados = Array.from(
+    document.querySelectorAll(`input[type="checkbox"][data-multi-alvo="${CSS.escape(fid)}"]`)
+  ).filter(x => x.checked).map(x => x.value);
+
+  const hidden = document.getElementById(fid);
+  if (hidden) {
+    hidden.value = multiParaTexto(marcados);
+    // Notifica quem escuta 'change' (cálculo de progresso ao vivo, rastreio de alterações)
+    hidden.dispatchEvent(new Event('change', { bubbles: true }));
+  }
+  const resumo = document.getElementById(fid + '_resumo');
+  if (resumo) resumo.innerHTML = _multiResumoTexto(marcados);
 }
