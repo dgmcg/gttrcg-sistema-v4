@@ -242,6 +242,9 @@
       <div class="page-header">
         <div class="page-title">Fluxo do Processo <small>Desenho e Protocolos</small></div>
         <div class="page-actions">
+          <select id="fluxo-filtro-tipo" onchange="renderFluxo()" title="Ver apenas as etapas de um tipo de processo" style="min-width:210px">
+            <option value="">Todos os tipos de processo</option>
+          </select>
           <button class="btn primary" onclick="openAdicionarEtapa()">
             <svg viewBox="0 0 16 16" fill="currentColor"><path d="M8 2a.5.5 0 0 1 .5.5v5h5a.5.5 0 0 1 0 1h-5v5a.5.5 0 0 1-1 0v-5h-5a.5.5 0 0 1 0-1h5v-5A.5.5 0 0 1 8 2z"/></svg>
             Adicionar Etapa
@@ -250,7 +253,7 @@
       </div>
       <div class="alert info" style="margin-bottom:20px">
         <svg viewBox="0 0 16 16" fill="currentColor" width="14" height="14" style="flex-shrink:0;margin-top:1px"><path d="M8 16A8 8 0 1 0 8 0a8 8 0 0 0 0 16zm.93-9.412-1 4.705c-.07.34.029.533.304.533.194 0 .487-.07.686-.246l-.088.416c-.287.346-.92.598-1.465.598-.703 0-1.002-.422-.808-1.319l.738-3.468c.064-.293.006-.399-.287-.47l-.451-.081.082-.381 2.29-.287zM8 5.5a1 1 0 1 1 0-2 1 1 0 0 1 0 2z"/></svg>
-        Mapa do fluxo GTTRCG — 39 etapas em 3 fases. Clique em qualquer etapa para editar seus dados, protocolo e campos de acompanhamento.
+        <span id="fluxo-resumo">Mapa do fluxo GTTRCG. Clique em qualquer etapa para editar seus dados, protocolo e campos de acompanhamento.</span>
       </div>
       <div id="fluxo-container"></div>
     </div>
@@ -478,6 +481,10 @@
     <div class="modal-body" id="detalhe-body"></div>
     <div class="modal-footer">
       <button class="btn" onclick="closeModal('modal-detalhe')">Fechar</button>
+      <button class="btn" id="detalhe-rel-btn" onclick="relDoDetalhe()" style="margin-right:auto">
+        <svg viewBox="0 0 16 16" fill="currentColor" width="14" height="14"><path d="M4 0h5.293A1 1 0 0 1 10 .293L13.707 4a1 1 0 0 1 .293.707V14a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V2a2 2 0 0 1 2-2zm5.5 1.5v2a1 1 0 0 0 1 1h2l-3-3zM5 7.5a.5.5 0 0 1 .5-.5h5a.5.5 0 0 1 0 1h-5a.5.5 0 0 1-.5-.5zm0 2.5a.5.5 0 0 1 .5-.5h5a.5.5 0 0 1 0 1h-5a.5.5 0 0 1-.5-.5zm0 2.5a.5.5 0 0 1 .5-.5h3a.5.5 0 0 1 0 1h-3a.5.5 0 0 1-.5-.5z"/></svg>
+        Gerar Relatório
+      </button>
       <button class="btn" id="detalhe-edit-btn">
         <svg viewBox="0 0 16 16" fill="currentColor" width="14" height="14"><path d="M12.146.146a.5.5 0 0 1 .708 0l3 3a.5.5 0 0 1 0 .708l-10 10a.5.5 0 0 1-.168.11l-5 2a.5.5 0 0 1-.65-.65l2-5a.5.5 0 0 1 .11-.168l10-10z"/></svg>
         Editar Dados Gerais
@@ -532,6 +539,47 @@
       <button class="btn danger sm" id="btn-excluir-etapa" onclick="excluirEtapa()" style="margin-right:auto;display:none">Excluir Etapa</button>
       <button class="btn" onclick="closeModal('modal-etapa-fluxo')">Cancelar</button>
       <button class="btn primary" onclick="salvarEtapaFluxo()">Salvar Etapa</button>
+    </div>
+  </div>
+</div>
+
+<!-- Modal: Gerador de Relatório -->
+<div id="modal-relatorio" class="modal-overlay">
+  <div class="modal rel-modal">
+    <div class="modal-header">
+      <div>
+        <div class="modal-title">Gerar Relatório</div>
+        <div class="modal-subtitle"><span id="rel-processo-nome"></span> <span id="rel-processo-sub" style="color:var(--text3)"></span></div>
+      </div>
+      <button class="close-btn" onclick="closeModal('modal-relatorio')"><svg viewBox="0 0 16 16" fill="currentColor"><path d="M4.646 4.646a.5.5 0 0 1 .708 0L8 7.293l2.646-2.647a.5.5 0 0 1 .708.708L8.707 8l2.647 2.646a.5.5 0 0 1-.708.708L8 8.707l-2.646 2.647a.5.5 0 0 1-.708-.708L7.293 8 4.646 5.354a.5.5 0 0 1 0-.708z"/></svg></button>
+    </div>
+
+    <div class="rel-corpo">
+      <div class="rel-coluna-esq">
+        <div class="rel-modelos">
+          <select id="rel-modelo-sel" onchange="relCarregarModelo(this.value)"></select>
+          <button class="btn sm" onclick="relSalvarModelo()" title="Salvar as escolhas atuais como modelo">Salvar modelo</button>
+          <button class="btn sm danger" onclick="relExcluirModelo()" title="Excluir o modelo selecionado">Excluir</button>
+        </div>
+        <div class="rel-dica">Marque o que deve entrar no documento. A prévia ao lado mostra o resultado com os dados reais deste processo.</div>
+        <div id="rel-painel"></div>
+      </div>
+      <div class="rel-coluna-dir">
+        <div class="rel-previa-topo">Prévia do documento</div>
+        <div id="rel-previa" class="rel-previa-area"></div>
+      </div>
+    </div>
+
+    <div class="modal-footer">
+      <button class="btn" onclick="closeModal('modal-relatorio')">Fechar</button>
+      <button class="btn" onclick="relBaixarWord()">
+        <svg viewBox="0 0 16 16" fill="currentColor" width="13" height="13"><path d="M8.5 1v8.793l2.646-2.647a.5.5 0 0 1 .708.708l-3.5 3.5a.5.5 0 0 1-.708 0l-3.5-3.5a.5.5 0 1 1 .708-.708L7.5 9.793V1a.5.5 0 0 1 1 0zM2 13.5a.5.5 0 0 1 .5-.5h11a.5.5 0 0 1 0 1h-11a.5.5 0 0 1-.5-.5z"/></svg>
+        Baixar para Word
+      </button>
+      <button class="btn primary" onclick="relImprimir()">
+        <svg viewBox="0 0 16 16" fill="currentColor" width="13" height="13"><path d="M4 1.5a1 1 0 0 1 1-1h6a1 1 0 0 1 1 1V4h1.5A1.5 1.5 0 0 1 15 5.5v5a1.5 1.5 0 0 1-1.5 1.5H12v2a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1v-2H2.5A1.5 1.5 0 0 1 1 10.5v-5A1.5 1.5 0 0 1 2.5 4H4V1.5zM5 4h6V1.5H5V4zm0 8v2.5h6V12H5z"/></svg>
+        Imprimir / Salvar PDF
+      </button>
     </div>
   </div>
 </div>
@@ -610,6 +658,7 @@ const GTTRCG_CONFIG = {
 <script src="js/contratos.js"></script>
 <script src="js/configuracoes.js"></script>
 <script src="js/modais.js"></script>
+<script src="js/relatorios.js"></script>
 <script src="js/novidades.js"></script>
 
 <!-- GTTRCG_CONFIG movido para antes dos scripts JS -->
