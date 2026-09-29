@@ -15,6 +15,9 @@
 // ── Estado em memória ────────────────────────────────────────
 const _DB = {};
 
+// Momento da última leitura bem-sucedida da base (usado no rodapé dos relatórios)
+let _ultimaLeituraDaBase = null;
+
 // ── Credenciais (única coisa no localStorage) ────────────────
 let GSHEET_URL   = '';
 let GSHEET_TOKEN = '';
@@ -62,6 +65,9 @@ async function carregarDados() {
     });
 
     console.log(`[GTTRCG DB] ${importados} coleções carregadas do Sheets`);
+    // Momento da última leitura da base — os relatórios registram isso no
+    // rodapé, para que se saiba a que instante dos dados eles se referem.
+    _ultimaLeituraDaBase = new Date();
     _mostrarLoading(false);
     showSyncBadge('ok');
     return true;
