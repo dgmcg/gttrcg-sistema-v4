@@ -746,3 +746,92 @@ tbody td { padding: 10px 12px; vertical-align: middle; color: var(--text); }
 .multi-opcao:hover { background: var(--bg2); color: var(--text); }
 .multi-opcao input { width: auto; margin: 0; cursor: pointer; flex-shrink: 0; }
 .multi-opcao input:disabled { cursor: default; }
+
+/* ── GERADOR DE RELATÓRIOS ────────────────────────────────── */
+.rel-modal { max-width: 1240px; width: 96vw; }
+.rel-corpo {
+  display: flex; gap: 0; align-items: stretch;
+  max-height: calc(100vh - 230px); min-height: 420px;
+}
+.rel-coluna-esq {
+  width: 340px; flex-shrink: 0; overflow-y: auto;
+  padding: 14px 16px; border-right: 1px solid var(--border);
+}
+.rel-coluna-dir { flex: 1; display: flex; flex-direction: column; background: var(--bg2); min-width: 0; }
+.rel-previa-topo {
+  font-size: 11px; text-transform: uppercase; letter-spacing: .6px;
+  color: var(--text3); padding: 8px 16px; border-bottom: 1px solid var(--border);
+  background: var(--bg1); flex-shrink: 0;
+}
+.rel-previa-area { flex: 1; overflow-y: auto; padding: 18px; }
+
+/* A folha na prévia: fundo branco sempre, mesmo no tema escuro — é
+   assim que o documento vai sair impresso. */
+.rel-previa-area .rel-folha {
+  background: #fff; color: #1A1F29; padding: 16mm 14mm;
+  max-width: 190mm; margin: 0 auto;
+  box-shadow: 0 2px 12px rgba(0,0,0,.25); border-radius: 2px;
+  font-family: "Segoe UI", Calibri, Arial, sans-serif;
+  font-size: 10.5pt; line-height: 1.5;
+}
+
+.rel-modelos { display: flex; gap: 6px; margin-bottom: 10px; }
+.rel-modelos select { flex: 1; min-width: 0; font-size: 12px; }
+.rel-modelos .btn { flex-shrink: 0; white-space: nowrap; }
+.rel-dica { font-size: 11px; color: var(--text3); margin-bottom: 12px; line-height: 1.5; }
+
+.rel-bloco-item {
+  border: 1px solid var(--border); border-radius: var(--radius);
+  padding: 9px 11px; margin-bottom: 8px; background: var(--bg1);
+}
+.rel-bloco-item.desligado { opacity: .55; background: transparent; }
+.rel-bloco-topo { display: flex; align-items: center; gap: 8px; cursor: pointer; }
+.rel-bloco-nome { font-weight: 600; font-size: 13px; flex: 1; }
+.rel-bloco-cont {
+  font-size: 10px; color: var(--text3); background: var(--bg3);
+  padding: 1px 7px; border-radius: 9px; font-family: var(--mono);
+}
+.rel-bloco-desc { font-size: 11px; color: var(--text3); margin: 3px 0 0 24px; line-height: 1.45; }
+
+.rel-opcoes { margin: 8px 0 0 24px; display: flex; flex-direction: column; gap: 4px; }
+.rel-opcao { display: flex; align-items: flex-start; gap: 6px; font-size: 11.5px; cursor: pointer; color: var(--text2); }
+.rel-opcao input { margin-top: 2px; flex-shrink: 0; }
+
+.rel-campos-box { margin: 8px 0 0 24px; }
+.rel-campos-box > summary {
+  font-size: 11px; color: var(--text3); cursor: pointer;
+  display: flex; align-items: center; gap: 6px; list-style: none;
+}
+.rel-campos-box > summary::-webkit-details-marker { display: none; }
+.rel-campos-box > summary::before { content: '▸'; transition: transform .15s; }
+.rel-campos-box[open] > summary::before { transform: rotate(90deg); }
+.rel-mini {
+  font-size: 10px; padding: 0 6px; border: 1px solid var(--border);
+  background: var(--bg2); color: var(--text2); border-radius: 3px; cursor: pointer;
+}
+.rel-mini:hover { background: var(--accent); color: #fff; border-color: var(--accent); }
+.rel-campos-lista { margin-top: 6px; display: flex; flex-direction: column; gap: 3px; }
+.rel-campo-item { display: flex; align-items: center; gap: 6px; font-size: 11.5px; cursor: pointer; }
+.rel-subcampos {
+  margin: 2px 0 4px 20px; padding-left: 8px;
+  border-left: 1px dotted var(--border2); display: flex; flex-direction: column; gap: 2px;
+}
+.rel-sub-item { font-size: 11px; color: var(--text2); }
+
+.rel-ass-edit { margin: 9px 0 0 24px; display: flex; flex-direction: column; gap: 3px; }
+.rel-ass-edit label { font-size: 10px; text-transform: uppercase; letter-spacing: .5px; color: var(--text3); }
+.rel-ass-edit input { font-size: 12px; padding: 4px 7px; }
+
+@media (max-width: 900px) {
+  .rel-corpo { flex-direction: column; max-height: none; }
+  .rel-coluna-esq { width: auto; border-right: none; border-bottom: 1px solid var(--border); max-height: 40vh; }
+  .rel-previa-area .rel-folha { padding: 10mm; }
+}
+
+/* A prévia vive num iframe isolado: o documento tem estilos próprios
+   que não devem escapar para a interface do sistema. */
+#rel-previa-frame {
+  width: 100%; max-width: 196mm; margin: 0 auto; display: block;
+  border: none; background: #fff; border-radius: 2px;
+  box-shadow: 0 2px 12px rgba(0,0,0,.25); min-height: 300px;
+}
