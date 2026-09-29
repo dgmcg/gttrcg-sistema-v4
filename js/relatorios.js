@@ -31,7 +31,8 @@ const REL_CORES = {
   vermelhoTxt: '#C34342',
 };
 
-const REL_BRASAO = 'img/brasao-pe.png';
+// Definido em brasao.js, carregado antes deste arquivo.
+const REL_BRASAO = (typeof REL_BRASAO_DATA !== 'undefined') ? REL_BRASAO_DATA : '';
 
 // ── Cabeçalho institucional ───────────────────────────────────
 const REL_ORGAO = {
@@ -246,6 +247,72 @@ function relEstadoEtapa(ac) {
   return { classe: 'pendente', rotulo: 'Não iniciada', num: null };
 }
 
+
+// ============================================================
+// LAYOUT — o Word não entende grid nem flex
+//
+// O Word renderiza HTML antigo: CSS grid e flexbox são ignorados e
+// tudo empilha numa coluna só. Onde o layout depende de colunas, o
+// modo 'word' gera <table>, que o Word respeita desde sempre.
+// O conteúdo continua vindo de um lugar só — muda a caixa, não o texto.
+// ============================================================
+
+/** Distribui itens em colunas: grade CSS na tela, tabela no Word. */
+function _relGrade(itens, nColunas, modo, classe) {
+  if (!itens.length) return '';
+  if (modo !== 'word') {
+    return `<div class="${classe}">${itens.map(i =>
+      `<div${i.largo ? ' class="rel-largo"' : ''}>${i.html}</div>`).join('')}</div>`;
+  }
+  // Word: uma linha de tabela a cada n itens; item largo ocupa a linha toda
+  const larg = Math.floor(100 / nColunas);
+  let html = `<table class="${classe}" width="100%" cellspacing="0" cellpadding="0"><tr>`;
+  let naLinha = 0;
+  itens.forEach(i => {
+    if (i.largo) {
+      if (naLinha) { html += _relPreenche(nColunas - naLinha, larg) + '</tr><tr>'; naLinha = 0; }
+      html += `<td colspan="${nColunas}" class="rel-td">${i.html}</td></tr><tr>`;
+      return;
+    }
+    if (naLinha === nColunas) { html += '</tr><tr>'; naLinha = 0; }
+    html += `<td width="${larg}%" class="rel-td" valign="top">${i.html}</td>`;
+    naLinha++;
+  });
+  if (naLinha && naLinha < nColunas) html += _relPreenche(nColunas - naLinha, larg);
+  return html + '</tr></table>';
+}
+
+/** Células vazias para fechar a última linha da tabela. */
+function _relPreenche(quantas, larg) {
+  let t = '';
+  for (let i = 0; i < quantas; i++) t += `<td width="${larg}%"></td>`;
+  return t;
+}
+
+/** Faixa com as cores do estado. */
+function _relFaixaCores(modo) {
+  if (modo !== 'word') return '<div class="rel-faixa"><i></i><i></i><i></i><i></i></div>';
+  const c = REL_CORES;
+  return `<table width="100%" cellspacing="0" cellpadding="0" style="margin-bottom:16px">
+    <tr>
+      <td width="67%" bgcolor="${c.azul}" style="font-size:2pt;line-height:2pt">&nbsp;</td>
+      <td width="11%" bgcolor="${c.amarelo}" style="font-size:2pt;line-height:2pt">&nbsp;</td>
+      <td width="11%" bgcolor="${c.vermelho}" style="font-size:2pt;line-height:2pt">&nbsp;</td>
+      <td width="11%" bgcolor="${c.verde}" style="font-size:2pt;line-height:2pt">&nbsp;</td>
+    </tr></table>`;
+}
+
+/** Linha de blocos lado a lado (painel de situação). */
+function _relColunas(blocos, modo) {
+  if (!blocos.length) return '';
+  if (modo !== 'word') return `<div class="rel-situacao">${blocos.join('')}</div>`;
+  const larg = Math.floor(100 / blocos.length);
+  return `<table class="rel-situacao" width="100%" cellspacing="0" cellpadding="8"
+    style="border:1px solid #C9D0DC;border-left:4px solid ${REL_CORES.azul}"><tr>` +
+    blocos.map(b => `<td width="${larg}%" valign="top">${b}</td>`).join('') +
+    '</tr></table>';
+}
+
 // ============================================================
 // 3. RENDER — documento a partir de catálogo + receita + dados
 // ============================================================
@@ -256,7 +323,7 @@ function relEstadoEtapa(ac) {
  * é aplicada por relDocumentoCompleto(), que serve tanto à prévia
  * quanto à impressão e ao Word.
  */
-function relMontarProcesso(proc, receita) {
+function relMontarProcesso(proc, receita, modo) {
   const cat     = catalogoRelatorioProcesso(proc);
   const etapas  = etapasOrdenadas(etapasDoProcesso(proc));
   const acomp   = proc.acompanhamento || {};
@@ -266,23 +333,35 @@ function relMontarProcesso(proc, receita) {
 
   let html = '';
   let nSecao = 0;
-  const tituloSecao = t => { nSecao++; return `<h2 class="rel-h2">${nSecao}. ${escHtml(t)}</h2>`; };
+  const tituloSecao = t => {
+    nSecao++;
+    const txt = `${nSecao}. ${escHtml(t)}`;
+    return modo === 'word'
+      ? `<div style="font-size:9.5pt;font-weight:bold;color:${REL_CORES.azul};` +
+        `border-bottom:1.5pt solid ${REL_CORES.azul};padding-bottom:3px;` +
+        `margin:14px 0 9px;text-align:left">${txt.toUpperCase()}</div>`
+      : `<h2 class="rel-h2">${txt}</h2>`;
+  };
 
   // ── Identificação ────────────────────────────────────────
   if (blocoOn('identificacao')) {
     const campos = cat.find(b => b.key === 'identificacao').campos
       .filter(c => ligado('identificacao', c.key));
     if (campos.length) {
-      html += `<section class="rel-secao">${tituloSecao('Identificação')}<div class="rel-dados">`;
-      campos.forEach(c => {
+      const itens = campos.map(c => {
         let v = proc[c.key];
         if (c.usuario) v = relNomeUsuario(v);
-        html += `<div class="rel-campo${c.largo ? ' rel-largo' : ''}">
-          <span class="rel-rot">${escHtml(c.label)}</span>
-          <span class="rel-val">${relValor(v, c.data)}</span>
-        </div>`;
+        return {
+          largo: !!c.largo,
+          html: modo === 'word'
+            ? `<div class="rel-rot">${escHtml(c.label)}</div>
+               <div class="rel-val">${relValor(v, c.data)}</div>`
+            : `<span class="rel-rot">${escHtml(c.label)}</span>
+               <span class="rel-val">${relValor(v, c.data)}</span>`,
+        };
       });
-      html += '</div></section>';
+      html += `<section class="rel-secao">${tituloSecao('Identificação')}` +
+              _relGrade(itens, 3, modo, 'rel-dados') + '</section>';
     }
   }
 
@@ -301,10 +380,17 @@ function relMontarProcesso(proc, receita) {
       </div>`);
     }
     if (ligado('situacao', 'progresso')) {
+      const barra = (modo === 'word')
+        ? `<table width="100%" cellspacing="0" cellpadding="0" style="margin-top:6px;height:7px">
+             <tr>
+               <td width="${pct}%" bgcolor="${REL_CORES.azul}" style="font-size:4pt;line-height:4pt">&nbsp;</td>
+               <td width="${100 - pct}%" bgcolor="#E6EAF1" style="font-size:4pt;line-height:4pt">&nbsp;</td>
+             </tr></table>`
+        : `<div class="rel-barra"><i style="width:${pct}%"></i></div>`;
       blocos.push(`<div class="rel-bloco">
         <span class="rel-rot">Progresso</span>
         <div class="rel-num">${pct}%</div>
-        <div class="rel-barra"><i style="width:${pct}%"></i></div>
+        ${barra}
       </div>`);
     }
     if (ligado('situacao', 'etapasN')) {
@@ -322,8 +408,8 @@ function relMontarProcesso(proc, receita) {
       </div>`);
     }
     if (blocos.length) {
-      html += `<section class="rel-secao">${tituloSecao('Situação Atual')}
-        <div class="rel-situacao">${blocos.join('')}</div></section>`;
+      html += `<section class="rel-secao">${tituloSecao('Situação Atual')}` +
+              _relColunas(blocos, modo) + '</section>';
     }
   }
 
@@ -355,13 +441,24 @@ function relMontarProcesso(proc, receita) {
         if (est.classe !== 'na') ordem++;
         const numero = est.num || ordem;
 
-        corpo += `<div class="rel-etapa rel-${est.classe}">
-          <div class="rel-etapa-topo">
-            <span class="rel-etapa-n">${escHtml(String(numero))}</span>
-            <span class="rel-etapa-nome">${escHtml(e.nome)}</span>
-            <span class="rel-tarja rel-t-${est.classe === 'concluida' ? 'ok'
-              : est.classe === 'andamento' ? 'andando' : 'neutra'}">${escHtml(est.rotulo)}</span>
-          </div>`;
+        const tarjaCls = est.classe === 'concluida' ? 'ok'
+          : est.classe === 'andamento' ? 'andando' : 'neutra';
+        const corTarja = tarjaCls === 'ok' ? REL_CORES.verdeTxt
+          : tarjaCls === 'andando' ? REL_CORES.azul : '#5A6472';
+
+        corpo += `<div class="rel-etapa rel-${est.classe}">`;
+        // No Word o círculo numerado e a tarja arredondada não sobrevivem:
+        // viram número, nome e situação em texto, com o mesmo significado.
+        corpo += (modo === 'word')
+          ? `<div style="text-align:left;margin-bottom:4px">
+               <span style="font-weight:bold;font-size:10.5pt">${escHtml(String(numero))}. ${escHtml(e.nome)}</span>
+               <span style="font-size:8pt;font-weight:bold;color:${corTarja}">&nbsp;&nbsp;— ${escHtml(est.rotulo.toUpperCase())}</span>
+             </div>`
+          : `<div class="rel-etapa-topo">
+               <span class="rel-etapa-n">${escHtml(String(numero))}</span>
+               <span class="rel-etapa-nome">${escHtml(e.nome)}</span>
+               <span class="rel-tarja rel-t-${tarjaCls}">${escHtml(est.rotulo)}</span>
+             </div>`;
 
         if (est.classe === 'na') {
           corpo += `<div class="rel-etapa-meta"><span>Marcada como não aplicável` +
@@ -384,8 +481,15 @@ function relMontarProcesso(proc, receita) {
         meta.push(`Prazo: ${ac._prazo
           ? '<b>' + escHtml(fmtDate(ac._prazo)) + '</b>'
           : '<span class="rel-vazio">não informado</span>'}`);
-        corpo += `<div class="rel-etapa-meta">${meta.join('')}`;
-        if (sit) corpo += `<span class="rel-tarja rel-t-${sit.classe}">${escHtml(sit.texto)}</span>`;
+        const sep = (modo === 'word') ? ' &nbsp;·&nbsp; ' : '';
+        corpo += `<div class="rel-etapa-meta">${meta.map(m => `<span>${m}</span>`).join(sep)}`;
+        if (sit) {
+          corpo += (modo === 'word')
+            ? ` &nbsp;·&nbsp; <span style="font-weight:bold;color:${
+                sit.classe === 'ok' ? REL_CORES.verdeTxt : REL_CORES.vermelhoTxt
+              }">${escHtml(sit.texto)}</span>`
+            : `<span class="rel-tarja rel-t-${sit.classe}">${escHtml(sit.texto)}</span>`;
+        }
         corpo += '</div>';
 
         if (opc('mostrarAcao') && e.acao) {
@@ -396,15 +500,15 @@ function relMontarProcesso(proc, receita) {
         const campos = (e.campos || []).filter(c =>
           c.tipo !== 'pdf' && ligado('etapas', `campo_${e.id}_${c.label}`));
         if (campos.length) {
-          corpo += '<div class="rel-etapa-campos">';
-          campos.forEach(c => {
+          const itens = campos.map(c => {
             const v = ac[c.label];
-            const largo = String(v || '').length > 60;
-            corpo += `<div${largo ? ' class="rel-largo"' : ''}>
-              <span class="rel-crot">${escHtml(c.label)}</span>
-              <div>${relValor(v, c.tipo === 'date')}</div></div>`;
+            return {
+              largo: String(v || '').length > 60,
+              html: `<div class="rel-crot">${escHtml(c.label)}</div>
+                     <div>${relValor(v, c.tipo === 'date')}</div>`,
+            };
           });
-          corpo += '</div>';
+          corpo += _relGrade(itens, 2, modo, 'rel-etapa-campos');
         }
 
         if (opc('mostrarObs') && ac._obs) {
@@ -589,17 +693,24 @@ function relProcedencia(proc, receita) {
 }
 
 /** Cabeçalho institucional com o brasão e a faixa de cores do estado. */
-function relCabecalho(brasaoSrc) {
+function relCabecalho(brasaoSrc, modo) {
   const src = brasaoSrc || REL_BRASAO;
-  return `<div class="rel-cabecalho">
-    <div class="rel-brasao"><img src="${src}" alt="Brasão do Estado de Pernambuco"></div>
-    <div class="rel-orgao">
-      <div class="rel-esfera">${escHtml(REL_ORGAO.esfera)}</div>
-      <div class="rel-secretaria">${escHtml(REL_ORGAO.secretaria)}</div>
-      <div class="rel-unidade">${REL_ORGAO.linhas.map(escHtml).join('<br>')}</div>
-    </div>
-  </div>
-  <div class="rel-faixa"><i></i><i></i><i></i><i></i></div>`;
+  const brasao = `<img src="${src}" alt="Brasão do Estado de Pernambuco" width="76">`;
+  const orgao = `<div class="rel-esfera">${escHtml(REL_ORGAO.esfera)}</div>
+    <div class="rel-secretaria">${escHtml(REL_ORGAO.secretaria)}</div>
+    <div class="rel-unidade">${REL_ORGAO.linhas.map(escHtml).join('<br>')}</div>`;
+
+  const topo = (modo === 'word')
+    ? `<table width="100%" cellspacing="0" cellpadding="0" style="margin-bottom:12px"><tr>
+         <td width="90" valign="middle">${brasao}</td>
+         <td valign="middle" style="padding-left:12px">${orgao}</td>
+       </tr></table>`
+    : `<div class="rel-cabecalho">
+         <div class="rel-brasao">${brasao}</div>
+         <div class="rel-orgao">${orgao}</div>
+       </div>`;
+
+  return topo + _relFaixaCores(modo);
 }
 
 /**
@@ -616,12 +727,15 @@ function relDocumentoCompleto(proc, receita, modo, brasaoSrc) {
   ].filter(Boolean).join(' · ');
 
   const corpo = `
-    ${relCabecalho(brasaoSrc)}
+    ${relCabecalho(brasaoSrc, modo)}
     <div class="rel-titulo-doc">
-      <h1>${escHtml(titulo)}</h1>
+      ${modo === 'word'
+        ? `<div style="font-size:14pt;font-weight:bold;color:${REL_CORES.azulEscuro};` +
+          `text-align:center;margin:0 0 3px">${escHtml(titulo)}</div>`
+        : `<h1>${escHtml(titulo)}</h1>`}
       <div class="rel-ref">${ref}</div>
     </div>
-    ${relMontarProcesso(proc, receita)}
+    ${relMontarProcesso(proc, receita, modo)}
     ${relProcedencia(proc, receita)}`;
 
   const base = modo === 'previa'
@@ -793,7 +907,45 @@ function relEstilosDocumento(modo) {
 
   @media print {
     html, body { margin: 0; padding: 0; }
-  }`;
+  }
+
+  ${paraWord ? `
+  /* O Word ignora grid e flex: aqui tudo vira bloco ou linha de tabela,
+     e o espaçamento passa a ser feito com margem e padding. */
+  .rel-dados, .rel-etapa-campos, .rel-situacao,
+  .rel-cabecalho, .rel-etapa-topo, .rel-etapa-meta { display: block; }
+  .rel-td { padding: 0 10px 9px 0; vertical-align: top; }
+  .rel-bloco { display: block; }
+  .rel-etapa-topo { margin-bottom: 5px; }
+  .rel-etapa-n {
+    display: inline-block; width: 18px; text-align: center;
+    background: ${REL_CORES.azul}; color: #fff; font-size: 8pt;
+    font-weight: 700; margin-right: 6px; padding: 1px 0;
+  }
+  .rel-concluida .rel-etapa-n { background: ${REL_CORES.verdeTxt}; }
+  .rel-pendente .rel-etapa-n, .rel-na .rel-etapa-n { background: #9BA4B4; }
+  .rel-etapa-nome { display: inline; font-weight: 600; font-size: 10.5pt; }
+  .rel-etapa-meta span { margin-right: 14px; }
+  .rel-tarja { display: inline; padding: 1px 6px; }
+  .rel-secao { margin-bottom: 14px; text-align: left; }
+  .rel-etapa { margin-bottom: 8px; padding: 6px 9px; text-align: left; }
+  .rel-etapa div, .rel-dados div, .rel-td { text-align: left; }
+
+  /* Títulos: como <div>, escapam do estilo que o Word impõe a h1/h2 */
+  .rel-h1w {
+    font-size: 14pt; font-weight: 700; color: ${REL_CORES.azulEscuro};
+    text-align: center; margin: 0 0 3px;
+  }
+  .rel-h2w {
+    font-size: 9.5pt; font-weight: 700; color: ${REL_CORES.azul};
+    text-transform: uppercase; letter-spacing: .06em;
+    border-bottom: 1.5pt solid ${REL_CORES.azul};
+    padding-bottom: 3px; margin: 0 0 9px;
+  }
+  /* Rótulo em cima, valor embaixo — o Word ignora display:block em span */
+  .rel-rot, .rel-crot { display: block; margin-bottom: 1px; }
+  .rel-val { display: block; }
+  ` : ''}`;
 }
 
 // ============================================================
@@ -987,59 +1139,52 @@ function _relNomeArquivo(proc, ext) {
   return base.slice(0, 120) + '.' + ext;
 }
 
-/** Abre o documento em janela própria e dispara a impressão. */
+/** Manda o documento para a impressão do navegador. */
 function relImprimir() {
   if (!_relProc) return;
   // O brasão precisa ir embutido: a janela de impressão não compartilha
   // o caminho relativo desta página.
-  _relBrasaoEmbutido().then(src => {
-    const html = relDocumentoCompleto(_relProc, _relReceita, 'impressao', src);
-    const w = window.open('', '_blank');
-    if (!w) {
-      alert('O navegador bloqueou a janela de impressão.\n\nLibere as janelas pop-up para este site e tente novamente.');
-      return;
+  const html = relDocumentoCompleto(_relProc, _relReceita, 'impressao', REL_BRASAO);
+
+  // Imprime por um quadro oculto, e não por uma janela nova: não esbarra
+  // no bloqueio de pop-up e o rodapé do navegador mostra o endereço do
+  // sistema em vez de "about:blank".
+  let frame = document.getElementById('rel-frame-impressao');
+  if (frame) frame.remove();
+  frame = document.createElement('iframe');
+  frame.id = 'rel-frame-impressao';
+  frame.setAttribute('aria-hidden', 'true');
+  frame.style.cssText = 'position:fixed;right:0;bottom:0;width:0;height:0;border:0;visibility:hidden';
+  document.body.appendChild(frame);
+
+  const doc = frame.contentDocument;
+  doc.open(); doc.write(html); doc.close();
+
+  const imprimir = () => {
+    try {
+      frame.contentWindow.focus();
+      frame.contentWindow.print();
+    } catch (e) {
+      alert('Não foi possível abrir a impressão. Tente novamente.');
     }
-    w.document.open(); w.document.write(html); w.document.close();
-  });
+  };
+  // Espera as imagens carregarem, senão o brasão sai em branco
+  if (doc.readyState === 'complete') setTimeout(imprimir, 120);
+  else frame.onload = () => setTimeout(imprimir, 120);
 }
 
 /** Baixa o documento em formato que o Word abre e edita. */
 function relBaixarWord() {
   if (!_relProc) return;
-  _relBrasaoEmbutido().then(src => {
-    const html = relDocumentoCompleto(_relProc, _relReceita, 'word', src);
-    const blob = new Blob(['﻿', html], { type: 'application/msword;charset=utf-8' });
-    const url  = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = _relNomeArquivo(_relProc, 'doc');
-    document.body.appendChild(a); a.click(); document.body.removeChild(a);
-    setTimeout(() => URL.revokeObjectURL(url), 2000);
-    showToast('Documento baixado — abra no Word para editar.');
-  });
-}
-
-/**
- * Converte o brasão em data URI, para que ele apareça na janela de
- * impressão e dentro do arquivo do Word, que não enxergam o caminho
- * relativo desta página. Se falhar, o documento sai sem o brasão em
- * vez de não sair.
- */
-let _relBrasaoCache = null;
-function _relBrasaoEmbutido() {
-  if (_relBrasaoCache) return Promise.resolve(_relBrasaoCache);
-  // Aberto direto do disco (file://) o navegador bloqueia a leitura da
-  // imagem; nesse caso vale o caminho relativo mesmo. Publicado, funciona.
-  if (location.protocol === 'file:') return Promise.resolve(REL_BRASAO);
-  return fetch(REL_BRASAO)
-    .then(r => r.ok ? r.blob() : Promise.reject(new Error('brasão não encontrado')))
-    .then(b => new Promise(res => {
-      const fr = new FileReader();
-      fr.onload = () => { _relBrasaoCache = fr.result; res(fr.result); };
-      fr.onerror = () => res(REL_BRASAO);
-      fr.readAsDataURL(b);
-    }))
-    .catch(() => REL_BRASAO);
+  const html = relDocumentoCompleto(_relProc, _relReceita, 'word', REL_BRASAO);
+  const blob = new Blob(['﻿', html], { type: 'application/msword;charset=utf-8' });
+  const url  = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = _relNomeArquivo(_relProc, 'doc');
+  document.body.appendChild(a); a.click(); document.body.removeChild(a);
+  setTimeout(() => URL.revokeObjectURL(url), 2000);
+  showToast('Documento baixado — abra no Word para editar.');
 }
 
 // ============================================================
